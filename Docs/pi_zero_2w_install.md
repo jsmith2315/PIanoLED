@@ -86,6 +86,7 @@ sudo apt install -y \
   git \
   network-manager \
   avahi-daemon \
+  fonts-freefont-ttf \
   python3 \
   python3-pip \
   python3-flask \

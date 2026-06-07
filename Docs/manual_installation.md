@@ -107,7 +107,7 @@ We are going to use  [RTP MIDI User Space Driver Daemon for Linux](https://githu
 `cd Piano-LED-Visualizer`
 - Install required libraries
 
-`sudo apt-get install -y python3-rpi.gpio python3-webcolors python3-psutil python3-mido python3-pillow python3-rtmidi python3-spidev python3-numpy python3-flask python3-waitress python3-websockets python3-werkzeug`
+`sudo apt-get install -y fonts-freefont-ttf python3-rpi.gpio python3-webcolors python3-psutil python3-mido python3-pillow python3-rtmidi python3-spidev python3-numpy python3-flask python3-waitress python3-websockets python3-werkzeug`
 
 `sudo pip3 install rpi-ws281x --break-system-packages`
 

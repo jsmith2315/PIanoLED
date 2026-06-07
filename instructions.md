@@ -197,6 +197,7 @@ sudo apt install -y \
   network-manager \
   avahi-daemon \
   libavahi-client3 \
+  fonts-freefont-ttf \
   python3 \
   python3-pip \
   python3-flask \

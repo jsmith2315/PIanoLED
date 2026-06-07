@@ -281,6 +281,37 @@ class MenuLCD:
         self._title_image_cache[cache_key] = resized
         return resized
 
+    @staticmethod
+    def _get_font_height(font):
+        """Return a practical pixel height for PIL font objects across Pillow versions."""
+        if hasattr(font, "size"):
+            try:
+                return int(font.size)
+            except (TypeError, ValueError):
+                pass
+
+        if hasattr(font, "getmetrics"):
+            try:
+                ascent, descent = font.getmetrics()
+                return int(ascent + descent)
+            except Exception:
+                pass
+
+        if hasattr(font, "getbbox"):
+            try:
+                left, top, right, bottom = font.getbbox("Ag")
+                return int(bottom - top)
+            except Exception:
+                pass
+
+        if hasattr(font, "getmask"):
+            try:
+                return int(font.getmask("Ag").size[1])
+            except Exception:
+                pass
+
+        return 10
+
     def rotate_image(self, image):
         if self.args.rotatescreen != "true":
             return image
@@ -919,7 +950,7 @@ class MenuLCD:
         viewport_height_orig = lcd_height - content_start_y
         max_visible_items = 4
         # Set item dimensions
-        item_height = scale(theme.item_padding_v * 2) + self.font.size
+        item_height = scale(theme.item_padding_v * 2) + self._get_font_height(self.font)
         total_item_height = item_height + scale(theme.item_gap)
         # Limit viewport height
         viewport_height = min(viewport_height_orig, total_item_height * max_visible_items)
