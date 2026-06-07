@@ -160,19 +160,19 @@ sudo apt install -y git
 Then clone the project:
 
 ```bash
-cd /home
+cd ~
 git clone https://github.com/onlaj/Piano-LED-Visualizer.git Piano-LED-Visualizer
-cd /home/Piano-LED-Visualizer
+cd ~/Piano-LED-Visualizer
 ```
 
-If you want to use your local modified checkout instead of GitHub, copy your repo from Windows with `scp` and place it at `/home/Piano-LED-Visualizer`.
+If you want to use your local modified checkout instead of GitHub, copy your repo from Windows with `scp` and place it at `~/Piano-LED-Visualizer`.
 
 ## Step 6A: Optional one-command installer
 
 If you want the Pi to do the package install, wheel install, SPI setup, service setup, and logging for you, run:
 
 ```bash
-cd /home/Piano-LED-Visualizer
+cd ~/Piano-LED-Visualizer
 bash autiubstakkpiz2.sh --wheel /home/<your-user>/rpi_ws281x-5.0.0-cp311-cp311-linux_armv7l.whl
 ```
 
@@ -272,8 +272,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/Piano-LED-Visualizer
-ExecStart=/usr/bin/python3 /home/Piano-LED-Visualizer/visualizer.py
+WorkingDirectory=/home/<your-user>/Piano-LED-Visualizer
+ExecStart=/usr/bin/python3 /home/<your-user>/Piano-LED-Visualizer/visualizer.py
 Restart=always
 RestartSec=2
 
