@@ -200,6 +200,7 @@ class PlatformRasp(PlatformBase):
     def change_hotspot_password(new_password):
         logger.info(f"Changing Hotspot password to: {new_password}")
         try:
+            PlatformRasp.create_hotspot_profile()
             # Modify the Hotspot connection with the new password
             subprocess.run([
                 'sudo', 'nmcli', 'connection', 'modify', 'Hotspot',
@@ -226,6 +227,7 @@ class PlatformRasp(PlatformBase):
     @staticmethod
     def enable_hotspot():
         logger.info("Enabling Hotspot")
+        PlatformRasp.create_hotspot_profile()
         subprocess.run(['sudo', 'nmcli', 'connection', 'up', 'Hotspot'])
 
     @staticmethod
@@ -298,8 +300,8 @@ class PlatformRasp(PlatformBase):
 
     def manage_hotspot(self, hotspot, usersettings, midiports, first_run=False, current_time=None):
         if first_run:
-            self.create_hotspot_profile()
             if int(usersettings.get("is_hotspot_active")):
+                self.create_hotspot_profile()
                 if not self.is_hotspot_running():
                     logger.info("Hotspot is enabled in settings but not running. Starting hotspot...")
                     self.enable_hotspot()
