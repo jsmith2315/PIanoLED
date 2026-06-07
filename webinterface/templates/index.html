@@ -1,0 +1,1057 @@
+<!doctype html>
+<html class="dark" xmlns:x-transition="" lang="eng">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="apple-touch-icon" sizes="180x180" href="../static/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="../static/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../static/favicon-16x16.png">
+    <link rel="mask-icon" href="../static/safari-pinned-tab.svg" color="#0ed3cf">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <meta name="theme-color" content="#0ed3cf">
+
+    <title>Piano LED Visualizer</title>
+    <link href="{{ url_for('static', filename='custom.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='sheet_music.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='tailwind.css') }}" rel="stylesheet">
+
+    <!-- local links to chart plugins -->
+    <script src="{{ url_for('static', filename='js/lib/chart.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lib/chartjs-adapter-date-fns.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lib/chartjs-plugin-annotation.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lib/chartjs-plugin-zoom.js') }}"></script>
+
+</head>
+
+<body class="bg-gray-100 dark:bg-gray-900">
+
+
+<script>
+    // Store WebSocket globally so practice page can reuse it
+    window.mainWebSocket = null;
+    window.mainWebSocketMessageHandlers = [];
+    
+    function establish_socket_connection(try_count) {
+        // If practice page has a connection, reuse it
+        if (window.practiceWebSocket && window.practiceWebSocket.readyState === WebSocket.OPEN) {
+            console.log("Reusing practice WebSocket connection");
+            window.mainWebSocket = window.practiceWebSocket;
+            return;
+        }
+        
+        // If there's already a connection, don't create a new one
+        if (window.mainWebSocket && window.mainWebSocket.readyState === WebSocket.OPEN) {
+            console.log("WebSocket already connected, reusing");
+            return;
+        }
+        
+        console.log("Connecting to websocket")
+        const socket = new WebSocket('ws://' + window.location.hostname + ':8765/learning');
+        window.mainWebSocket = socket;
+        socket.addEventListener('open', function (event) {
+            console.log('Connected to server');
+            socket.send('Connection Established');
+        });
+        socket.addEventListener('message', function (event) {
+            // Define handler functions (can be moved to ui.js and attached to window)
+            if (typeof window.handleTimeUpdate !== 'function') {
+                 window.handleTimeUpdate = function(timeValue) { 
+                    // Check if go_to_time exists and call it
+                    if (typeof window.go_to_time === 'function') {
+                         // Ensure timeValue is a number
+                        const numericTime = parseFloat(timeValue);
+                        if (!isNaN(numericTime)) {
+                            window.go_to_time(numericTime);
+                        } else {
+                             console.error("handleTimeUpdate received non-numeric value:", timeValue);
+                        }
+                    } else {
+                        console.log("window.go_to_time is not defined, cannot update time."); 
+                    }
+                 }; 
+            }
+            if (typeof window.handleMidiEvent !== 'function') {
+                window.handleMidiEvent = function(rawData) {
+                     let textarea = document.getElementById('midi_events_textarea');
+                     if (typeof (textarea) != 'undefined' && textarea != null) {
+                        const d = new Date();
+                        var t = "\r\n" + d.getHours() + ":" + d.getMinutes() + ":" + d.getSeconds() + "." + d.getMilliseconds() + " "
+                        textarea.value += t + rawData.replace("midi_event", ""); 
+                        textarea.scrollTop = textarea.scrollHeight;
+                    }
+                 };
+            }
+
+            let data;
+            try {
+                // First check if it's a midi_event string before trying JSON parse
+                if (typeof event.data === 'string' && event.data.startsWith("midi_event")) {
+                     window.handleMidiEvent(event.data);
+                    return;
+                }
+                data = JSON.parse(event.data);
+            } catch (e) {
+                // Attempt to handle as old time update format if not JSON and not midi_event
+                 if (typeof event.data === 'string' && !isNaN(parseFloat(event.data))) {
+                    console.log("Received string number message, assuming time update:", event.data);
+                    window.handleTimeUpdate(event.data);
+                 } else {
+                    console.log("Received non-JSON message or parse error:", event.data);
+                 }
+                return;
+            }
+
+            // Handle known JSON message types
+            if (data && data.type) {
+                switch (data.type) {
+                    case "score_update":
+                        if (typeof window.handleScoreUpdate === 'function') {
+                            window.handleScoreUpdate(data);
+                        } else {
+                            console.log("window.handleScoreUpdate is not defined.");
+                        }
+                        break;
+                    case "highscore_update":
+                        if (typeof window.handleHighscoreUpdate === 'function') {
+                            window.handleHighscoreUpdate(data);
+                        }
+                        break;
+                    case "learning_note_index": // For sheet music sync
+                        window.handleTimeUpdate(data.current_note_index); 
+                        break;
+                    case "session_summary":
+                        function tryHandleSummary(summaryData, retryCount = 5) {
+                            if (typeof Chart !== 'undefined' && typeof window.handleSessionSummary === 'function') {
+                                console.log("Chart and handleSessionSummary are defined. Calling handler.");
+                                window.handleSessionSummary(summaryData);
+                            } else if (retryCount > 0) {
+                                console.log(`Chart or handleSessionSummary not ready, retrying (${retryCount} left)...`);
+                                setTimeout(() => tryHandleSummary(summaryData, retryCount - 1), 100);
+                            } else {
+                                console.error("Failed to call handleSessionSummary after multiple retries. Chart or function not defined.");
+                            }
+                        }
+                        tryHandleSummary(data);
+                        break;
+                    // Removed midi_event case as it's handled before JSON parsing
+                    default:
+                        console.log("Received unknown JSON message type:", data.type, data);
+                        // Optional fallback for time update if payload looks numeric
+                         if (typeof data.payload === 'number' || (typeof data.payload === 'string' && !isNaN(parseFloat(data.payload)))) {
+                             window.handleTimeUpdate(data.payload);
+                         }
+                }
+            } else {
+                 console.log("Received message without type or unrecognized format:", event.data);
+                 // Fallback for simple numeric string time update?
+                 if (typeof event.data === 'string' && !isNaN(parseFloat(event.data))) {
+                    window.handleTimeUpdate(event.data);
+                 } 
+            }
+        });
+        socket.addEventListener('close', function (event) {
+            console.log('Connection closed, reconnecting...');
+            window.mainWebSocket = null;
+            if (try_count < 10) {
+                setTimeout(establish_socket_connection, 5000, try_count + 1);
+            }
+        });
+
+        socket.addEventListener('error', function (event) {
+            console.log('WebSocket error:', event);
+        });
+
+        window.onbeforeunload = function () {
+            socket.onclose = function () {
+            }; // disable onclose handler first
+            socket.close();
+            window.mainWebSocket = null;
+        };
+    }
+
+    establish_socket_connection(0);
+
+
+</script>
+
+
+<div id="slider">
+    <div class="flex min-h-screen overflow-y-hidden bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200"
+         x-data="setup()" x-init="$refs.loading.classList.add('hidden')">
+        <!-- Loading screen -->
+        <div
+                id="loading_screen"
+                x-ref="loading"
+                class="fixed inset-0 z-50 flex items-center justify-center text-white bg-black bg-opacity-50"
+                style="backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px)"
+                data-translate="loading..."
+        >
+            Loading.....
+        </div>
+
+        <div id="close_sidebar" hidden @click="closeSidebarMenu()">1</div>
+        <div id="open_sidebar" hidden @click="openSidebarMenu()">2</div>
+
+        <!-- Sidebar backdrop -->
+        <div
+                x-show.in.out.opacity="isSidebarOpen"
+                class="fixed inset-0 z-10 bg-black bg-opacity-20 lg:hidden"
+        ></div>
+
+        <!-- Sidebar -->
+        <aside
+                x-transition:enter="transition transform duration-300"
+                x-transition:enter-start="-translate-x-full opacity-30  ease-in"
+                x-transition:enter-end="translate-x-0 opacity-100 ease-out"
+                x-transition:leave="transition transform duration-300"
+                x-transition:leave-start="translate-x-0 opacity-100 ease-out"
+                x-transition:leave-end="-translate-x-full opacity-0 ease-in"
+                class="fixed inset-y-0 z-10 flex flex-col flex-shrink-0 w-64 overflow-hidden transition-all
+        transform glass-strong shadow-glass-lg text-gray-900 dark:text-gray-200 border-r border-white/10 lg:z-auto
+        lg:static"
+                :class="{'-translate-x-full lg:translate-x-0 lg:w-20': !isSidebarOpen}"
+        >
+            <!-- sidebar header -->
+            <div class="flex items-center justify-between flex-shrink-0 p-2"
+                 :class="{'lg:justify-center': !isSidebarOpen}">
+          <span class="p-2 text-xl font-semibold leading-8 tracking-wider uppercase whitespace-nowrap">
+            <img class="w-10" src="../static/logo.svg" alt="logo"><span :class="{'lg:hidden': !isSidebarOpen}"></span>
+          </span>
+                <button @click="toggleSidebarMenu()" class="p-2 rounded-md lg:hidden">
+                    <svg
+                            class="w-6 h-6 text-gray-900 dark:text-gray-400 "
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                    >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <!-- Sidebar links -->
+            <nav class="flex-1 overflow-auto hover:overflow-y-auto">
+                <ul @click="closeSidebarMenu()" onclick="loadAjax('home')" class="p-2 overflow-hidden">
+                    <li>
+                        <a
+                                href="#"
+                                id="home"
+                                class="flex items-center p-2 space-x-2 rounded-glass-sm transition-smooth-fast hover:glass-light hover:shadow-glass"
+                                :class="{'justify-center': !isSidebarOpen}"
+                        >
+                <span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5
+                  10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011
+                  1v4a1 1 0 001 1m-6 0h6"/>
+                </svg>
+                </span>
+                            <span :class="{ 'lg:hidden': !isSidebarOpen }" data-translate="home">
+                                Home
+                            </span>
+                        </a>
+                    </li>
+                </ul>
+
+
+                <ul @click="closeSidebarMenu()" onclick="loadAjax('ledsettings')" class="p-2 overflow-hidden">
+                    <li>
+                        <a
+                                onclick="history.pushState({}, '', '#ledsettings')"
+                                id="ledsettings"
+                                class="flex items-center p-2 space-x-2 rounded-glass-sm transition-smooth-fast hover:glass-light hover:shadow-glass"
+                                :class="{'justify-center': !isSidebarOpen}"
+                        >
+                <span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                         stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4
+                            12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0
+                            0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                    </svg>
+                </span>
+                            <span :class="{ 'lg:hidden': !isSidebarOpen }" data-translate="led_settings">
+                                LED Settings
+                            </span>
+                        </a>
+                    </li>
+                </ul>
+
+                <ul @click="closeSidebarMenu()" onclick="loadAjax('songs')" class="p-2 overflow-hidden">
+                    <li>
+                        <a
+                                onclick="history.pushState({}, '', '#songs')"
+                                id="songs"
+                                class="flex items-center p-2 space-x-2 rounded-glass-sm transition-smooth-fast hover:glass-light hover:shadow-glass"
+                                :class="{'justify-center': !isSidebarOpen}"
+                        >
+                <span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                         stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+                    </svg>
+                </span>
+                            <span :class="{ 'lg:hidden': !isSidebarOpen }" data-translate="songs">
+                                Songs
+                            </span>
+                        </a>
+                    </li>
+                </ul>
+
+                <ul @click="closeSidebarMenu()" onclick="loadAjax('sequences')" class="p-2 overflow-hidden">
+                    <li>
+                        <a
+                                onclick="history.pushState({}, '', '#sequences')"
+                                id="sequences"
+                                class="flex items-center p-2 space-x-2 rounded-glass-sm transition-smooth-fast hover:glass-light hover:shadow-glass"
+                                :class="{'justify-center': !isSidebarOpen}"
+                        >
+                <span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 64 64"
+                         stroke="currentColor">
+                        <path fill="none" stroke-miterlimit="10" stroke-width="4"
+                              d="M8 8h16v16H8zM40 40h16v16H40zM56 28l-8 8-8-8M8 36l8-8 8 8"/>
+                        <path fill="none" stroke-miterlimit="10" stroke-width="4" d="M40 48H16V28M24 16h24v20"/></svg>
+                </span>
+                            <span :class="{ 'lg:hidden': !isSidebarOpen }" data-translate="sequences">
+                                Sequences
+                            </span>
+                        </a>
+                    </li>
+                </ul>
+
+                <ul @click="closeSidebarMenu()" onclick="loadAjax('practice')" class="p-2 overflow-hidden">
+                    <li>
+                        <a
+                                onclick="history.pushState({}, '', '#practice')"
+                                id="practice"
+                                class="flex items-center p-2 space-x-2 rounded-glass-sm transition-smooth-fast hover:glass-light hover:shadow-glass"
+                                :class="{'justify-center': !isSidebarOpen}"
+                        >
+                <span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 -960 960 960" fill="currentColor">
+                      <path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h130v-180h-10q-17 0-28.5-11.5T280-420v-340h-80v560Zm430 0h130v-560h-80v340q0 17-11.5 28.5T640-380h-10v180Zm-240 0h180v-180h-10q-17 0-28.5-11.5T520-420v-340h-80v340q0 17-11.5 28.5T400-380h-10v180Z"/>
+                    </svg>
+                </span>
+                            <span :class="{ 'lg:hidden': !isSidebarOpen }" data-translate="practice">
+                                Practice
+                            </span>
+                        </a>
+                    </li>
+                </ul>
+
+                <ul @click="closeSidebarMenu()" onclick="loadAjax('ports')" class="p-2 overflow-hidden">
+                    <li>
+                        <a
+                                onclick="history.pushState({}, '', '#ports')"
+                                id="ports"
+                                class="flex items-center p-2 space-x-2 rounded-glass-sm transition-smooth-fast hover:glass-light hover:shadow-glass"
+                                :class="{'justify-center': !isSidebarOpen}"
+                        >
+                <span>
+                    <svg class="transition duration-300 fill-current text-gray-800 dark:text-gray-200"
+                         xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                         style="-ms-transform:rotate(360deg);-webkit-transform:rotate(360deg)"
+                         transform="rotate(360)"><path d="M12 2a10 10 0 0110 10 10 10 0 01-10 10A10 10 0 012 12 10
+                         10 0 0112 2m8.2 10c0-3.8-2.6-7-6.2-8v2h-4V4a8.2 8.2 0 00-6.2 8 8.2 8.2 0 008.2 8.2 8.2 8.2
+                         0 008.2-8.2M7 10.6A1.4 1.4 0 018.4 12 1.4 1.4 0 017 13.4a1.4 1.4 0 010-2.8m10 0a1.4 1.4 0
+                         011.4 1.4 1.4 1.4 0 01-1.4 1.4 1.4 1.4 0 01-1.4-1.4 1.4 1.4 0 011.4-1.4m-8.6 3.7a1.4 1.4 0
+                         011.3 1.3c0 .8-.6 1.4-1.3 1.4A1.4 1.4 0 017 15.6c0-.7.6-1.3 1.4-1.3m7.2 0c.8 0 1.4.6 1.4
+                         1.3a1.4 1.4 0 01-1.4 1.4c-.7 0-1.3-.6-1.3-1.4a1.4 1.4 0 011.3-1.3M12 15.6a1.4 1.4 0 011.4
+                         1.4 1.4 1.4 0 01-1.4 1.4 1.4 1.4 0 01-1.4-1.4 1.4 1.4 0 011.4-1.4z"/><path
+                            fill="rgba(0, 0, 0, 0)" d="M0 0h24v24H0z"/></svg>
+                </span>
+                            <span :class="{ 'lg:hidden': !isSidebarOpen }" data-translate="ports_settings">
+                                Ports Settings
+                            </span>
+                        </a>
+                    </li>
+                </ul>
+
+
+                <ul @click="closeSidebarMenu()" onclick="loadAjax('ledanimations')" class="p-2 overflow-hidden">
+                    <li>
+                        <a
+                                onclick="history.pushState({}, '', '#ledanimations')"
+                                id="ledanimations"
+                                class="flex items-center p-2 space-x-2 rounded-glass-sm transition-smooth-fast hover:glass-light hover:shadow-glass"
+                                :class="{'justify-center': !isSidebarOpen}"
+                        >
+                <span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                         stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6
+                      17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
+                    </svg>
+                </span>
+                            <span :class="{ 'lg:hidden': !isSidebarOpen }" data-translate="led_animations">
+                                LED Animations
+                            </span>
+                        </a>
+                    </li>
+                </ul>
+
+                <ul @click="closeSidebarMenu()" onclick="loadAjax('network')" class="p-2 overflow-hidden">
+                    <li>
+                        <a
+                                onclick="history.pushState({}, '', '#network')"
+                                id="network"
+                                class="flex items-center p-2 space-x-2 rounded-glass-sm transition-smooth-fast hover:glass-light hover:shadow-glass"
+                                :class="{'justify-center': !isSidebarOpen}"
+                        >
+                <span>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                         stroke="currentColor" class="w-6 h-6">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808
+                      13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z"/>
+                    </svg>
+                </span>
+                            <span :class="{ 'lg:hidden': !isSidebarOpen }" data-translate="wifi">
+                                Wi-Fi
+                            </span>
+                        </a>
+                    </li>
+                </ul>
+
+            </nav>
+            <!-- Sidebar footer -->
+            <div class="flex-shrink-0 p-2 max-h-20">
+                <button id="switch_ports_sidebar" class="flex items-center justify-center w-full px-4 py-2 space-x-1 font-medium
+              tracking-wider uppercase glass hover:glass-light rounded-glass transition-smooth-fast focus:outline-none focus:ring-2 focus:ring-cyan-500/50">
+                <span class="flex">
+                    <svg class="fill-current text-gray-800 dark:text-gray-200" xmlns="http://www.w3.org/2000/svg"
+                         width="24" height="24"
+                         style="-ms-transform:rotate(360deg);-webkit-transform:rotate(360deg)"
+                         transform="rotate(360)"><path d="M12 2a10 10 0 0110 10 10 10 0 01-10 10A10 10 0 012 12 10
+                         10 0 0112 2m8.2 10c0-3.8-2.6-7-6.2-8v2h-4V4a8.2 8.2 0 00-6.2 8 8.2 8.2 0 008.2 8.2 8.2 8.2
+                         0 008.2-8.2M7 10.6A1.4 1.4 0 018.4 12 1.4 1.4 0 017 13.4a1.4 1.4 0 010-2.8m10 0a1.4 1.4 0
+                         011.4 1.4 1.4 1.4 0 01-1.4 1.4 1.4 1.4 0 01-1.4-1.4 1.4 1.4 0 011.4-1.4m-8.6 3.7a1.4 1.4 0
+                         011.3 1.3c0 .8-.6 1.4-1.3 1.4A1.4 1.4 0 017 15.6c0-.7.6-1.3 1.4-1.3m7.2 0c.8 0 1.4.6 1.4
+                         1.3a1.4 1.4 0 01-1.4 1.4c-.7 0-1.3-.6-1.3-1.4a1.4 1.4 0 011.3-1.3M12 15.6a1.4 1.4 0 011.4
+                         1.4 1.4 1.4 0 01-1.4 1.4 1.4 1.4 0 01-1.4-1.4 1.4 1.4 0 011.4-1.4z"/><path
+                            fill="rgba(0, 0, 0, 0)" d="M0 0h24v24H0z"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                       stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                    </svg>
+                </span>
+                    <span :class="{'lg:hidden': !isSidebarOpen}" data-translate="switch_ports">
+                        Switch Ports
+                    </span>
+                </button>
+            </div>
+        </aside>
+
+        <div class="flex flex-col flex-1 h-full overflow-hidden">
+            <!-- Navbar -->
+            <header class="flex-shrink-0 border-none">
+                <div class="flex items-center justify-between p-2">
+                    <!-- Navbar left -->
+                    <div class="flex items-center space-x-3">
+                        <span class="p-2 text-xl font-semibold tracking-wider uppercase lg:hidden"><img class="w-10"
+                                                                                                        src="../static/logo.svg"
+                                                                                                        alt="logo"></span>
+                        <!-- Toggle sidebar button -->
+                        <button @click="toggleSidebarMenu()" class="p-2 rounded-md focus:outline-none focus:ring">
+                            <svg
+                                    class="w-4 h-4 text-gray-600 dark:text-gray-400"
+                                    :class="{'transform transition-transform -rotate-180': isSidebarOpen}"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                            >
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M13 5l7 7-7 7M5 5l7 7-7 7"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="flex">
+                        <div class="w-12 h-8 absolute inline-block text-left">
+                            <button id="lang-dropdown" type="button"
+                                    class="w-12 h-8  mr-8 absolute inline-block text-left right-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                     stroke-width="1.5"
+                                     stroke="currentColor" class="w-6 h-6">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                          d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 016-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 01-3.827-5.802"></path>
+                                </svg>
+                            </button>
+                            <div style="top: 25px" id="dropdown-content"
+                                 class="z-50 origin-top-right absolute right-0 w-28 h-80 overflow-auto rounded-md shadow-lg bg-gray-200 dark:bg-gray-600 ring-1 ring-gray-700 ring-opacity-5 text-gray-600 dark:text-gray-200">
+                                <div class="py-1" role="menu" aria-orientation="vertical"
+                                     aria-labelledby="lang-dropdown">
+                                    <a id="en" href="#"
+                                       class="block px-3 py-2 text-sm text-white hover:bg-gray-700 hover:text-gray-200"
+                                       role="menuitem">English</a>
+                                    <a id="he" href="#"
+                                       class="block px-3 py-2 text-sm text-white hover:bg-gray-700 hover:text-gray-200"
+                                       role="menuitem">עברית</a>
+                                    <a id="ar" href="#"
+                                       class="block px-3 py-2 text-sm text-white hover:bg-gray-700 hover:text-gray-200"
+                                       role="menuitem">العربية (AI translation)</a>                                        
+                                    <a id="pl" href="#"
+                                       class="block px-3 py-2 text-sm text-white hover:bg-gray-700 hover:text-gray-200"
+                                       role="menuitem">Polski</a>
+                                    <a id="de" href="#"
+                                       class="block px-3 py-2 text-sm text-white hover:bg-gray-700 hover:text-gray-200"
+                                       role="menuitem">Deutsch (AI translation)</a>
+                                    <a id="fr" href="#"
+                                       class="block px-3 py-2 text-sm text-white hover:bg-gray-700 hover:text-gray-200"
+                                       role="menuitem">Français (AI translation)</a>
+                                    <a id="es" href="#"
+                                       class="block px-3 py-2 text-sm text-white hover:bg-gray-700 hover:text-gray-200"
+                                       role="menuitem">Español (AI translation)</a>
+                                    <a id="zh" href="#"
+                                       class="block px-3 py-2 text-sm text-white hover:bg-gray-700 hover:text-gray-200"
+                                       role="menuitem">汉语 (简化字) (AI translation)</a>
+                                    <a id="hi" href="#"
+                                       class="block px-3 py-2 text-sm text-white hover:bg-gray-700 hover:text-gray-200"
+                                       role="menuitem">हिन्दी (AI translation)</a>
+                                    <a id="pt" href="#"
+                                       class="block px-3 py-2 text-sm text-white hover:bg-gray-700 hover:text-gray-200"
+                                       role="menuitem">Português (AI translation)</a>
+                                    <a id="ja" href="#"
+                                       class="block px-3 py-2 text-sm text-white hover:bg-gray-700 hover:text-gray-200"
+                                       role="menuitem">日本語 (AI translation)</a>
+                                    <a id="ko" href="#"
+                                       class="block px-3 py-2 text-sm text-white hover:bg-gray-700 hover:text-gray-200"
+                                       role="menuitem">한국어 (AI translation)</a>                                                                          
+                                </div>
+                            </div>
+                        </div>
+                        <label for="toggleDark" class="flex items-center cursor-pointer">
+                            <!-- toggle -->
+                            <div class="relative">
+                                <!-- input -->
+                                <input type="checkbox" id="toggleDark" class="sr-only" onclick="change_dark_mode();">
+                                <!-- line -->
+                                <div class="block glass-light w-14 h-8 rounded-full"></div>
+                                <!-- dot -->
+                                <div id="dot_icon"
+                                     class="dot absolute left-1 top-1 text-gray-400 dark:text-gray-200  w-6 h-6
+                                     rounded-full transition">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
+                                         viewBox="0 0 24 24"
+                                         stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0
+                                              008.354-5.646z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <!-- label -->
+                        </label>
+                    </div>
+                </div>
+                <!-- Main content -->
+                <main id="main" class="slide-in from-left flex-1 max-h-full p-5 overflow-hidden overflow-y-auto snap-y snap-proximity
+                scrollbar-w-2
+                scrollbar-track-gray-lighter scrollbar-thumb-rounded scrollbar-thumb-gray scrolling-touch">
+
+                </main>
+
+
+            </header>
+        </div>
+    </div>
+
+
+    <!-- Main footer -->
+    <footer class="flex items-center justify-between flex-shrink-0 p-4 border-t glass-strong shadow-glass-lg
+    text-gray-900 dark:text-gray-200 border-white/10 max-h-14">
+        <div>Onlaj &copy; 2025</div>
+        <div class="text-sm">
+            Made by
+            <a
+                    class="text-blue-600 dark:text-cyan-400 underline hover:text-blue-700 dark:hover:text-cyan-300 transition-colors"
+                    href="https://github.com/onlaj/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+            >Aleksander Evening</a
+            >
+        </div>
+        <div class="flex">
+            <!-- Discord svg -->
+            <a
+                    href="https://discord.gg/kQyABw8GCD"
+                    target="_blank"
+                    class="flex items-center space-x-1 mx-2"
+            >
+                <svg class="w-6 h-6 text-gray-400" fill="currentColor"
+                     viewBox="0 0 16 16">
+                    <path d="M13.545 2.907a13.227 13.227 0 0 0-3.257-1.011.05.05 0 0 0-.052.025c-.141.25-.297.577-.406.833a12.19
+                    12.19 0 0 0-3.658 0 8.258 8.258 0 0 0-.412-.833.051.051 0 0 0-.052-.025c-1.125.194-2.22.534-3.257 1.011a.041.041
+                    0 0 0-.021.018C.356 6.024-.213 9.047.066 12.032c.001.014.01.028.021.037a13.276 13.276 0 0 0 3.995 2.02.05.05
+                    0 0 0 .056-.019c.308-.42.582-.863.818-1.329a.05.05 0 0 0-.01-.059.051.051 0 0 0-.018-.011 8.875 8.875 0 0 1-1.248-.595.05.05
+                    0 0 1-.02-.066.051.051 0 0 1 .015-.019c.084-.063.168-.129.248-.195a.05.05 0 0 1 .051-.007c2.619 1.196 5.454 1.196 8.041 0a.052.052
+                    0 0 1 .053.007c.08.066.164.132.248.195a.051.051 0 0 1-.004.085 8.254 8.254 0 0 1-1.249.594.05.05 0 0 0-.03.03.052.052
+                    0 0 0 .003.041c.24.465.515.909.817 1.329a.05.05 0 0 0 .056.019 13.235 13.235 0 0 0 4.001-2.02.049.049 0 0
+                    0 .021-.037c.334-3.451-.559-6.449-2.366-9.106a.034.034 0 0 0-.02-.019Zm-8.198 7.307c-.789 0-1.438-.724-1.438-1.612
+                    0-.889.637-1.613 1.438-1.613.807 0 1.45.73 1.438 1.613 0 .888-.637 1.612-1.438 1.612Zm5.316 0c-.788
+                    0-1.438-.724-1.438-1.612 0-.889.637-1.613 1.438-1.613.807 0 1.451.73 1.438 1.613 0 .888-.631 1.612-1.438
+                    1.612Z"/>
+                </svg>
+                <span class="float-right hidden text-sm md:block" data-translate="join_discord">Join Discord server</span>
+            </a>
+
+            <!-- Github svg -->
+            <a
+                    href="https://github.com/onlaj/Piano-LED-Visualizer/"
+                    target="_blank"
+                    class="flex items-center space-x-1 mx-2"
+            >
+                <svg class="w-6 h-6 text-gray-400" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                    <path
+                            fill-rule="evenodd"
+                            d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38
+                            0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01
+                            1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95
+                            0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68
+                            0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0
+                            3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013
+                            8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+                    ></path>
+                </svg>
+                <span class="float-right hidden text-sm md:block" data-translate="view_on_github">View on Github</span>
+            </a>
+        </div>
+    </footer>
+</div>
+
+<!-- Load External Libraries -->
+<script src="../static/alpine.min.js" defer></script>
+<script src="../static/jquery-1.11.1.min.js" defer></script>
+<script src="../static/html-midi-player.js" defer></script>
+<script src="../static/abc2svg-1.js" defer></script>
+<script src="../static/abc2web.js" defer></script>
+<script src="../static/xml2abc.js" defer></script>
+
+<!-- Application Scripts -->
+<script src="../static/js/notifications.js"></script>
+<script src="../static/translations.js" defer></script>
+<script src="../static/js/files.js" defer></script>
+<script src="../static/js/number-input.js" defer></script>
+<script src="../static/js/initialize.js" defer></script>
+<script src="../static/js/metronome.js" defer></script>
+<script src="../static/js/utils.js" defer></script>
+<script src="../static/js/globals.js"></script>
+<script src="../static/js/ui.js"></script>
+<script src="../static/js/profiles.js" defer></script>
+<script src="../static/index.js" defer></script>
+<script>
+    var homepage_interval = null;
+    var download_start = 0;
+    var upload_start = 0;
+    var refresh_rate = 1;
+    var last_cpu_usage = 0;
+    var last_download = 0;
+    var last_upload = 0;
+
+    const setup = () => {
+        return {
+            loading: true,
+            isSidebarOpen: false,
+            toggleSidebarMenu() {
+                this.isSidebarOpen = !this.isSidebarOpen
+            },
+            closeSidebarMenu() {
+                this.isSidebarOpen = false
+            },
+            openSidebarMenu() {
+                this.isSidebarOpen = true
+            },
+            isSettingsPanelOpen: false,
+            isSearchBoxOpen: false,
+        }
+    }
+
+    function setCookie(name, value, days) {
+        var expires = "";
+        if (days) {
+            var date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            expires = "; expires=" + date.toUTCString();
+        }
+        document.cookie = name + "=" + (value || "") + expires + "; path=/";
+    }
+
+    function getCookie(name) {
+        var nameEQ = name + "=";
+        var ca = document.cookie.split(';');
+        for (var i = 0; i < ca.length; i++) {
+            var c = ca[i];
+            while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+            if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+        }
+        return null;
+    }
+
+    if (getCookie('darkmode') == "0") {
+        document.documentElement.classList.remove('dark')
+    }
+
+    function change_dark_mode() {
+        if (document.getElementById('toggleDark').checked) {
+            document.documentElement.classList.add('dark')
+            document.getElementById("dot_icon").innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" ' +
+                'fill="none" viewBox="0 0 24 24" stroke="currentColor">\n' +
+                '  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 ' +
+                '018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />\n' +
+                '</svg>'
+            setCookie('darkmode', "1", 365);
+        } else {
+            document.documentElement.classList.remove('dark')
+            document.getElementById("dot_icon").innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" ' +
+                'fill="none" viewBox="0 0 24 24" stroke="currentColor">\n' +
+                '  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 ' +
+                '12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 ' +
+                '12a4 4 0 11-8 0 4 4 0 018 0z" />\n' +
+                '</svg>'
+            setCookie('darkmode', "0", 365);
+        }
+    }
+
+    // Initialize toggle checkbox state to match dark mode
+    document.getElementById("toggleDark").checked = document.documentElement.classList.contains("dark");
+
+    document.getElementById('switch_ports_sidebar').onclick = function () {
+        document.getElementById('switch_ports_sidebar').disabled = true;
+        if (document.getElementById('switch_ports') != null) {
+            document.getElementById('switch_ports').disabled = true;
+        }
+        switch_ports()
+    }
+
+    let touchstartX = 0;
+    let touchendX = 0;
+    const slider = document.getElementById('slider');
+
+    function difference(a, b) {
+        return Math.abs(a - b);
+    }
+
+    function handleGesture() {
+        if (difference(touchendX, touchstartX) > 100) {
+            if (touchendX < touchstartX) document.getElementById('close_sidebar').click();
+            if (touchendX > touchstartX) document.getElementById('open_sidebar').click();
+        }
+    }
+
+    slider.addEventListener('touchstart', e => {
+        touchstartX = e.changedTouches[0].screenX;
+    });
+
+    slider.addEventListener('touchend', e => {
+        touchendX = e.changedTouches[0].screenX;
+        if (e.target.type !== "range" && e.target.nodeName !== "TD"
+            && e.target.nodeName !== "TABLE" && e.target.nodeName !== "TH" && e.target.nodeName !== "TR") {
+            handleGesture();
+        }
+    });
+
+    const dropdown = document.getElementById("lang-dropdown");
+    const content = document.getElementById("dropdown-content");
+
+    // Hide the dropdown content by default
+    content.classList.add("hidden");
+
+    // Show the dropdown content when the button is clicked
+    dropdown.addEventListener("click", function () {
+        content.classList.toggle("hidden");
+    });
+
+    // Add event listener to each language link
+    const links = content.getElementsByTagName("a");
+    for (let i = 0; i < links.length; i++) {
+        links[i].addEventListener("click", function (event) {
+            event.preventDefault();
+            let lang = this.id;
+            setCookie("lang", lang, 365);
+            translateStaticContent();
+            content.classList.toggle("hidden");
+        });
+    }
+
+    function get_presets() {
+        if(document.getElementById("preset_list") == null) return;
+        
+        $.ajax({
+            url: '/api/presets',
+            type: 'GET',
+            success: function (response) {
+                if (response.success) {
+                    var select = document.getElementById("preset_list");
+                    if (!select) return;
+                    var current = select.value;
+                    select.innerHTML = '<option value="" disabled selected>' + translate('select_preset') + '</option>';
+                    response.presets.forEach(function (preset) {
+                        var option = document.createElement("option");
+                        option.value = preset;
+                        option.text = preset.replace('.xml', '');
+                        select.appendChild(option);
+                    });
+                    if(current && Array.from(select.options).some(opt => opt.value === current)) {
+                        select.value = current;
+                    } else {
+                        select.value = "";
+                    }
+                }
+            }
+        });
+    }
+
+    function save_preset() {
+        var name = prompt(translate('enter_preset_name'));
+        if (name) {
+            $.ajax({
+                url: '/api/presets',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({name: name}),
+                success: function (response) {
+                    if (response.success) {
+                        get_presets();
+                        showAlert(translate('preset_saved_successfully'), 'info');
+                    } else {
+                        showAlert(translate('preset_error') + response.error, 'error');
+                    }
+                }
+            });
+        }
+    }
+
+    function overwrite_preset() {
+        var select = document.getElementById("preset_list");
+        var name = select.value;
+        if (!name) {
+            showAlert(translate('please_select_preset_to_save'), 'warning');
+            return;
+        }
+        
+        showConfirm(translate('overwrite_preset_confirm').replace('{0}', name.replace('.xml', '')), function() {
+            $.ajax({
+                url: '/api/presets',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({name: name}),
+                success: function (response) {
+                    if (response.success) {
+                        showAlert(translate('preset_saved_successfully'), 'info');
+                    } else {
+                        showAlert(translate('preset_error') + response.error, 'error');
+                    }
+                }
+            });
+        });
+    }
+
+    function load_preset() {
+        var select = document.getElementById("preset_list");
+        var name = select.value;
+        if (!name) {
+            showAlert(translate('please_select_preset_first'), 'warning');
+            return;
+        }
+        
+        showConfirm(translate('load_preset_confirm').replace('{0}', name.replace('.xml', '')), function() {
+            var loading = document.getElementById("loading_screen");
+            if(loading) loading.classList.remove("hidden");
+            
+            $.ajax({
+                url: '/api/presets/load',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({name: name}),
+                timeout: 60000, // 60 second timeout
+                success: function (response) {
+                    if (response.success) {
+                        // Refresh settings without full page reload
+                        if (typeof get_settings === 'function') {
+                            get_settings(false); // Update homepage display
+                        }
+                        // Check if ledsettings page is currently loaded by checking for key elements
+                        var ledSettingsPageLoaded = document.getElementById('brightness') !== null && 
+                                                   document.getElementById('color_mode') !== null &&
+                                                   document.getElementById('light_mode') !== null;
+                        if (ledSettingsPageLoaded) {
+                            // Reload the ledsettings page to refresh all settings
+                            if (typeof loadAjax === 'function') {
+                                loadAjax('ledsettings');
+                            }
+                        }
+                        if (typeof get_ports === 'function') {
+                            get_ports(); // Refresh port information
+                        }
+                        if(loading) loading.classList.add("hidden");
+                    } else {
+                        if(loading) loading.classList.add("hidden");
+                        showAlert(translate('preset_error') + response.error, 'error');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    if(loading) loading.classList.add("hidden");
+                    if (status === 'timeout') {
+                        showAlert(translate('preset_load_timeout'), 'error');
+                    } else {
+                        showAlert(translate('preset_load_error') + error, 'error');
+                    }
+                }
+            });
+        });
+    }
+
+    function delete_preset() {
+        var select = document.getElementById("preset_list");
+        var name = select.value;
+        if (!name) {
+            showAlert(translate('please_select_preset_first'), 'warning');
+            return;
+        }
+        
+        showConfirm(translate('delete_preset_confirm').replace('{0}', name), function() {
+            $.ajax({
+                url: '/api/presets/delete',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({name: name}),
+                success: function (response) {
+                    if (response.success) {
+                        get_presets();
+                        select.value = "";
+                    } else {
+                        showAlert(translate('preset_error') + response.error, 'error');
+                    }
+                }
+            });
+        });
+    }
+
+    function rename_preset() {
+        var select = document.getElementById("preset_list");
+        var old_name = select.value;
+        if (!old_name) {
+            showAlert(translate('please_select_preset_first'), 'warning');
+            return;
+        }
+        
+        var new_name = prompt(translate('enter_new_preset_name'), old_name.replace('.xml', ''));
+        if (new_name && new_name + ".xml" != old_name) {
+            $.ajax({
+                url: '/api/presets/rename',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({old_name: old_name, new_name: new_name}),
+                success: function (response) {
+                    if (response.success) {
+                        get_presets();
+                    } else {
+                        showAlert(translate('preset_error') + response.error, 'error');
+                    }
+                }
+            });
+        }
+    }
+
+    function upload_preset(input) {
+        if (input.files && input.files[0]) {
+            var formData = new FormData();
+            formData.append('file', input.files[0]);
+            
+            $.ajax({
+                url: '/api/presets/upload',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function (response) {
+                    if (response.success) {
+                        get_presets();
+                        showAlert(translate('preset_uploaded_successfully'), 'info');
+                    } else {
+                        showAlert(translate('preset_error') + response.error, 'error');
+                    }
+                    input.value = ''; 
+                }
+            });
+        }
+    }
+
+    function download_preset() {
+        var select = document.getElementById("preset_list");
+        var name = select.value;
+        if (!name) {
+            showAlert(translate('please_select_preset_first'), 'warning');
+            return;
+        }
+        window.location.href = '/api/presets/download?name=' + encodeURIComponent(name);
+    }
+
+</script>
+
+<!-- Notification System Container -->
+<div id="notification-container"></div>
+
+<!-- Input Port Setup Popup Modal -->
+<div id="port_setup_popup_overlay" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 hidden" style="backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px)" onclick="handle_port_setup_overlay_click(event)">
+    <div id="port_setup_popup" class="glass-strong shadow-glass-lg rounded-glass p-6 max-w-md min-w-80 w-auto mx-4 transform transition-all" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-200" data-translate="input_port_setup">Input Port Setup</h3>
+            <button onclick="hide_port_setup_popup()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        
+        <div class="mb-4">
+            <p class="text-sm text-gray-700 dark:text-gray-300 mb-2" data-translate="no_input_port_message">
+                No input port is currently set. Please select your piano from the list below.
+            </p>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4" data-translate="port_will_be_set_both">
+                The selected port will be set as both input port and playback port.
+            </p>
+        </div>
+        
+        <div class="mb-4">
+            <label class="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300" data-translate="select_piano_port">Select Piano Port:</label>
+            <div class="relative">
+                <select id="port_setup_dropdown" class="h-10 block appearance-none w-full glass-light py-2 px-3 pr-8 rounded-glass leading-tight transition-smooth-fast text-gray-900 dark:text-gray-200">
+                    <option value="" disabled selected data-translate="loading_ports">Loading ports...</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-200">
+                    <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"></path>
+                    </svg>
+                </div>
+            </div>
+            <div id="port_setup_no_ports_message" class="hidden mt-2 text-sm text-yellow-600 dark:text-yellow-400" data-translate="no_ports_available">
+                No MIDI ports are currently available. Please connect your piano and refresh the page.
+            </div>
+        </div>
+        
+        <div class="mb-4">
+            <label class="flex items-center cursor-pointer">
+                <input type="checkbox" id="port_setup_dont_show_again" class="mr-2 rounded">
+                <span class="text-sm text-gray-700 dark:text-gray-300" data-translate="dont_show_again">Don't show this message again</span>
+            </label>
+        </div>
+        
+        <div class="flex space-x-3">
+            <button onclick="handle_port_setup_submit()" id="port_setup_submit_btn" class="flex-1 h-10 outline-none glass-light hover:glass font-bold py-2 px-4 rounded-glass transition-smooth-fast inline-flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 dark:text-gray-200" disabled>
+                <span data-translate="set_port">Set Port</span>
+            </button>
+            <button onclick="handle_port_setup_cancel()" class="flex-1 h-10 outline-none glass-light hover:glass font-bold py-2 px-4 rounded-glass transition-smooth-fast inline-flex items-center justify-center text-gray-900 dark:text-gray-200">
+                <span data-translate="cancel">Cancel</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
