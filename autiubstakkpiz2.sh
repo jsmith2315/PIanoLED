@@ -178,6 +178,7 @@ install_os_packages() {
     ca-certificates \
     network-manager \
     avahi-daemon \
+    libavahi-client3 \
     python3 \
     python3-pip \
     python3-flask \
@@ -263,7 +264,10 @@ install_rtpmidid() {
 
   local deb_path="/tmp/rtpmidid_24.12.2_armhf.deb"
   run wget -O "$deb_path" https://github.com/davidmoreno/rtpmidid/releases/download/v24.12/rtpmidid_24.12.2_armhf.deb
-  run sudo dpkg -i "$deb_path"
+  if ! sudo dpkg -i "$deb_path"; then
+    echo
+    echo "==> rtpmidid had unmet dependencies; repairing with apt"
+  fi
   run sudo apt -f install -y
   run rm -f "$deb_path"
 }

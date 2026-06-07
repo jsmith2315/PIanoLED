@@ -196,6 +196,7 @@ sudo apt install -y \
   git \
   network-manager \
   avahi-daemon \
+  libavahi-client3 \
   python3 \
   python3-pip \
   python3-flask \
@@ -254,7 +255,7 @@ If you want RTP-MIDI, install `rtpmidid`:
 ```bash
 cd /tmp
 wget https://github.com/davidmoreno/rtpmidid/releases/download/v24.12/rtpmidid_24.12.2_armhf.deb
-sudo dpkg -i rtpmidid_24.12.2_armhf.deb || sudo apt -f install -y
+sudo dpkg -i rtpmidid_24.12.2_armhf.deb || true
 sudo apt -f install -y
 rm -f rtpmidid_24.12.2_armhf.deb
 ```
