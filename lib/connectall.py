@@ -4,6 +4,8 @@ import sys
 import os
 from xml.etree import ElementTree as ET
 
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 
 def connectall(usersettings=None):
     """
@@ -19,7 +21,9 @@ def connectall(usersettings=None):
         # Try multiple possible locations for the settings file
         settings_paths = [
             "config/settings.xml",  # When called from app directory
-            "/home/Piano-LED-Visualizer/config/settings.xml",  # When called from system
+            os.path.join(REPO_ROOT, "config/settings.xml"),  # When called from repository path
+            os.path.expanduser("~/Piano-LED-Visualizer/config/settings.xml"),  # Common user install path
+            "/home/Piano-LED-Visualizer/config/settings.xml",  # Legacy system path
             "/opt/Piano-LED-Visualizer/config/settings.xml",  # Alternative system path
         ]
         

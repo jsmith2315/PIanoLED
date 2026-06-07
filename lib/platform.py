@@ -31,11 +31,12 @@ class Hotspot:
         self.hotspot_script_time = 0
         self.time_without_wifi = 0
         self.last_wifi_check_time = 0
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
         # Move chmod to background thread to avoid blocking startup
         def chmod_background():
             try:
-                subprocess.run("sudo chmod a+rwxX -R /home/Piano-LED-Visualizer/", shell=True, check=True)
+                subprocess.run(['sudo', 'chmod', 'a+rwxX', '-R', repo_root], check=True)
             except Exception as e:
                 logger.warning(f"Error setting permissions in background: {e}")
         

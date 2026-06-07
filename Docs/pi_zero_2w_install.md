@@ -70,12 +70,12 @@ Copy that wheel to the Zero 2 W, for example into `/home/<your-user>/wheelhouse/
 On the Zero 2 W:
 
 ```bash
-cd /home
+cd ~
 git clone https://github.com/onlaj/Piano-LED-Visualizer.git Piano-LED-Visualizer
-cd /home/Piano-LED-Visualizer
+cd ~/Piano-LED-Visualizer
 ```
 
-If you are using your own modified checkout, copy your version into `/home/Piano-LED-Visualizer` instead.
+If you are using your own modified checkout, copy your version into `~/Piano-LED-Visualizer` instead.
 
 ## Step 4: Install the runtime packages
 
@@ -162,8 +162,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/Piano-LED-Visualizer
-ExecStart=/usr/bin/python3 /home/Piano-LED-Visualizer/visualizer.py
+WorkingDirectory=/home/<your-user>/Piano-LED-Visualizer
+ExecStart=/usr/bin/python3 /home/<your-user>/Piano-LED-Visualizer/visualizer.py
 Restart=always
 RestartSec=2
 

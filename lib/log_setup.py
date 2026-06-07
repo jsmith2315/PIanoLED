@@ -1,5 +1,6 @@
 import logging
 from logging.handlers import RotatingFileHandler
+import os
 import sys
 
 # Create a custom logger
@@ -10,7 +11,9 @@ logger.setLevel(logging.DEBUG)
 
 # Create handlers
 console_handler = logging.StreamHandler()
-file_handler = RotatingFileHandler('/home/Piano-LED-Visualizer/visualizer.log', maxBytes=500000, backupCount=10)
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LOG_PATH = os.path.join(REPO_ROOT, 'visualizer.log')
+file_handler = RotatingFileHandler(LOG_PATH, maxBytes=500000, backupCount=10)
 
 
 # Set the level for handlers

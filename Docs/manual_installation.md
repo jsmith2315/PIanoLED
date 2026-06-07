@@ -1,5 +1,8 @@
 ## Pre-installation setup
 
+> Note:
+> For Raspberry Pi Zero 2 W on Bookworm, use the newer `instructions.md` and `autiubstakkpiz2.sh` flow instead of this older manual guide. The steps below describe the legacy install path and are kept only for reference.
+
 Before installing Raspberry Pi OS Lite, it's recommended to configure your system with the following settings:
 - Username: plv
 - Password: visualizer
@@ -73,7 +76,7 @@ We are going to use  [RTP MIDI User Space Driver Daemon for Linux](https://githu
 
 - Navigate to /home folder:
 
-`cd /home/`
+`cd ~/`
 
 - Download and install the prerequisite `libfmt9` package:
 
@@ -99,7 +102,7 @@ We are going to use  [RTP MIDI User Space Driver Daemon for Linux](https://githu
 
 - GIT clone repository
 
-`sudo git clone https://github.com/onlaj/Piano-LED-Visualizer`
+`git clone https://github.com/onlaj/Piano-LED-Visualizer.git Piano-LED-Visualizer`
 
 `cd Piano-LED-Visualizer`
 - Install required libraries
@@ -115,7 +118,7 @@ We are going to use  [RTP MIDI User Space Driver Daemon for Linux](https://githu
 `Select "System options" then “Boot / Auto Login” then “Console Autologin” `
 - Enable autostart script on boot:
 
-`sudo nano /lib/systemd/system/visualizer.service`
+`sudo nano /etc/systemd/system/visualizer.service`
 
 Paste and save:
 
@@ -125,23 +128,22 @@ Description=Piano LED Visualizer
 After=network-online.target
 Wants=network-online.target
 
-[Install]
-WantedBy=multi-user.target
-
 [Service]
-ExecStart=sudo python3 /home/Piano-LED-Visualizer/visualizer.py
+WorkingDirectory=/home/<your-user>/Piano-LED-Visualizer
+ExecStart=/usr/bin/python3 /home/<your-user>/Piano-LED-Visualizer/visualizer.py
 Restart=always
 Type=simple
-User=plv
-Group=plv
+
+[Install]
+WantedBy=multi-user.target
 ```
 
 *If you are using WaveShare 1.3inch 240x240 LED Hat instead of 1.44inch 128x128, edit accordingly:*
-`ExecStart=sudo python3 /home/Piano-LED-Visualizer/visualizer.py --display 1in3`
+`ExecStart=/usr/bin/python3 /home/<your-user>/Piano-LED-Visualizer/visualizer.py --display 1in3`
 
 *If you want to use your RPi upside down add `--rotatescreen true` :*
 
-`ExecStart=sudo python3 /home/Piano-LED-Visualizer/visualizer.py --rotatescreen true`
+`ExecStart=/usr/bin/python3 /home/<your-user>/Piano-LED-Visualizer/visualizer.py --rotatescreen true`
 
 - Reload daemon and enable service:
 
@@ -154,6 +156,6 @@ Group=plv
 
 - Change permissions:
 
-  `sudo chmod a+rwxX -R /home/Piano-LED-Visualizer/`
+  `sudo chmod a+rwxX -R /home/<your-user>/Piano-LED-Visualizer/`
 
 Now you can type `sudo reboot` to test if everything works. After 1-3 minutes you should see Visualizer menu on RPi screen.

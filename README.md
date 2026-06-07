@@ -116,11 +116,11 @@ Both devices must be connected to the same network. By default, web interface wo
 
  The port can also be changed with the script's argument `--port`
 
-    sudo python3 /home/Piano-LED-Visualizer/visualizer.py --port 5000
+    sudo python3 /home/<your-user>/Piano-LED-Visualizer/visualizer.py --port 5000
 
 Although in my tests I did not notice any deterioration in performance, if necessary, you can disable the web interface with the `--webinterface` parameter
 
-    sudo python3 /home/Piano-LED-Visualizer/visualizer.py --webinterface false
+    sudo python3 /home/<your-user>/Piano-LED-Visualizer/visualizer.py --webinterface false
 
 
 ## FAQ ##
@@ -159,7 +159,7 @@ Notice, that you won't be able to use web interface
 
 For web interface: Open internet browser on device connected to the same network and type RPi's local address `pianoledvisualizer.local` Then from the menu on the left choose "songs management" tab.
 
-For SFTP: in any FTP program (like Filezilla) connect to your RPi local address (for example: sftp://192.168.1.10) and navigate to /home/Piano-LED-Visualizer/Songs.
+For SFTP: in any FTP program (like Filezilla) connect to your RPi local address (for example: sftp://192.168.1.10) and navigate to /home/<your-user>/Piano-LED-Visualizer/Songs.
 
 **Q - How do I update visualizer?**
 
@@ -169,7 +169,7 @@ After the update, a reboot is required.
 
 - **B** - Connect to your console using SSH and type:
 
-`cd /home/Piano-LED-Visualizer`
+`cd /home/<your-user>/Piano-LED-Visualizer`
 and then 
 
 `git pull origin master`

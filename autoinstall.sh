@@ -1,5 +1,17 @@
 #!/bin/bash
 
+echo "This legacy installer is no longer recommended for Raspberry Pi Zero 2 W."
+echo "Use instructions.md and autiubstakkpiz2.sh instead."
+
+if [ -f "./autiubstakkpiz2.sh" ]; then
+  echo "Delegating to ./autiubstakkpiz2.sh"
+  exec bash ./autiubstakkpiz2.sh "$@"
+fi
+
+echo "autiubstakkpiz2.sh was not found in the current directory."
+echo "Clone the repository into your user home directory and follow instructions.md."
+exit 1
+
 # Function to display error message and exit
 display_error() {
   echo "Error: $1" >&2
