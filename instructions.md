@@ -150,7 +150,14 @@ SSH back into the Pi if needed:
 ssh <your-user>@pianoledvisualizer.local
 ```
 
-Then on the Pi:
+Install `git` first on the Pi:
+
+```bash
+sudo apt update
+sudo apt install -y git
+```
+
+Then clone the project:
 
 ```bash
 cd /home
@@ -160,12 +167,30 @@ cd /home/Piano-LED-Visualizer
 
 If you want to use your local modified checkout instead of GitHub, copy your repo from Windows with `scp` and place it at `/home/Piano-LED-Visualizer`.
 
+## Step 6A: Optional one-command installer
+
+If you want the Pi to do the package install, wheel install, SPI setup, service setup, and logging for you, run:
+
+```bash
+cd /home/Piano-LED-Visualizer
+bash autiubstakkpiz2.sh --wheel /home/<your-user>/rpi_ws281x-5.0.0-cp311-cp311-linux_armv7l.whl
+```
+
+Notes:
+
+- the script is **verbose** and prints each step while it runs
+- it writes a full log to `install-logs/` inside the repo
+- it checks that the wheel is present before installing
+- it disables the Visualizer-managed hotspot by setting `is_hotspot_active` to `0`, so the Pi keeps using your normal Wi-Fi instead of trying to bring up `PianoLEDVisualizer`
+- if you do not need RTP-MIDI, add `--skip-rtpmidi`
+
+If you use the script, you can skip the manual install steps below and jump to the reboot and verification section after it finishes.
+
 ## Step 7: Install all precompiled runtime packages
 
 On the Pi:
 
 ```bash
-sudo apt update
 sudo apt full-upgrade -y
 sudo apt install -y \
   git \
