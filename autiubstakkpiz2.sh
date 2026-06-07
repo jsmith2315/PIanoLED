@@ -50,6 +50,16 @@ run() {
   "$@"
 }
 
+run_allow_fail() {
+  echo
+  echo "==> $*"
+  set +e
+  "$@"
+  local exit_code=$?
+  set -e
+  return "$exit_code"
+}
+
 require_repo_layout() {
   if [[ ! -f "$REPO_DIR/visualizer.py" || ! -f "$REPO_DIR/requirements.txt" ]]; then
     echo "ERROR: this script must live inside the Piano-LED-Visualizer repository."
@@ -170,9 +180,12 @@ PY
 }
 
 install_os_packages() {
-  run sudo apt update
-  run sudo apt full-upgrade -y
-  run sudo apt install -y \
+  # Recover cleanly if a previous installer run left dpkg/apt in a broken state.
+  run_allow_fail sudo apt-get -f install -y || true
+  run sudo dpkg --configure -a
+  run sudo apt-get update
+  run sudo apt-get full-upgrade -y
+  run sudo apt-get install -y \
     git \
     wget \
     ca-certificates \
@@ -268,7 +281,7 @@ install_rtpmidid() {
     echo
     echo "==> rtpmidid had unmet dependencies; repairing with apt"
   fi
-  run sudo apt -f install -y
+  run sudo apt-get -f install -y
   run rm -f "$deb_path"
 }
 
