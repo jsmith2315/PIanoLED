@@ -5,4 +5,5 @@ config/settings.xml
 data/
 webinterface/node_modules
 visualizer.log
+rpi_ws281x-wheel/wheelhouse/
 

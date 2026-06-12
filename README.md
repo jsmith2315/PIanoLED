@@ -72,13 +72,13 @@ The supported install path is now:
 - **Raspberry Pi Zero 2 W**
 - **Raspberry Pi OS Lite Bookworm 32-bit**
 - install all runtime packages from `apt`
-- install `rpi_ws281x` from a **prebuilt wheel**
+- install `rpi_ws281x` from a **prebuilt wheel** bundled in the repo under `wheelhouse/`
 
 Use the full step-by-step guide here:
 
 - [Pi Zero 2 W installation guide](./instructions.md)
 
-The repo also includes `autiubstakkpiz2.sh` if you want the Pi to perform the package install, wheel install, SPI setup, hotspot disable, and service setup after you copy the prebuilt wheel onto it.
+The repo also includes `autiubstakkpiz2.sh` if you want the Pi to perform the package install, wheel install, SPI setup, hotspot disable, and service setup automatically. If the repo contains a matching wheel in `wheelhouse/`, the installer will find it on its own.
 
 ## Connecting LED Strip to Raspberry Pi
 There is no point to reinvent the wheel again, so here is a nice [diagram](https://web.archive.org/web/20230319222537/https://tutorials-raspberrypi.com/wp-content/uploads/2017/03/Raspberry-Pi-WS2812-Steckplatine.png).

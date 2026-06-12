@@ -15,6 +15,8 @@ Runtime files created by the app now live under `data/` inside the repo:
 
 The original `config/` and `Songs/` folders stay in the repo as built-in defaults, so you can update the code without overwriting your local runtime data.
 
+The recommended way to handle `rpi_ws281x` now is to keep the finished wheel in the repo under `wheelhouse/`. That way a fresh clone on the Pi already has the wheel available and the installer can auto-detect it.
+
 ## Why this is the recommended path
 
 Use **Bookworm 32-bit**, not Trixie, for this project on a Zero 2 W.
@@ -136,7 +138,20 @@ rpi_ws281x-5.0.0-cp311-cp311-linux_armv7l.whl
 
 That `cp311` part is why the Pi needs Python 3.11.
 
-## Step 5: Copy the wheel to the Pi
+## Step 5: Put the wheel into the repo
+
+After you build the wheel on Windows, copy it into this repo under `wheelhouse\` and commit it if you want future Pi installs to work from a plain `git clone` with no separate wheel transfer:
+
+```powershell
+New-Item -ItemType Directory -Force .\wheelhouse | Out-Null
+Copy-Item .\wheelhouse\wheelhouse\rpi_ws281x-5.0.0-cp311-cp311-linux_armv7l.whl .\wheelhouse\
+```
+
+If you commit that file to GitHub, a fresh clone on the Pi will already include the wheel.
+
+## Step 6: Optional direct copy to the Pi
+
+You only need this if the wheel is not already bundled in the repo you are cloning on the Pi.
 
 From PowerShell, copy the wheel to the Pi:
 
@@ -150,7 +165,7 @@ If `.local` does not work, use the Pi IP instead:
 scp .\wheelhouse\wheelhouse\rpi_ws281x-5.0.0-cp311-cp311-linux_armv7l.whl <your-user>@192.168.x.x:/home/<your-user>/
 ```
 
-## Step 6: Install the project on the Pi
+## Step 7: Install the project on the Pi
 
 SSH back into the Pi if needed:
 
@@ -175,27 +190,28 @@ cd ~/Piano-LED-Visualizer
 
 If you want to use your local modified checkout instead of GitHub, copy your repo from Windows with `scp` and place it at `~/Piano-LED-Visualizer`.
 
-## Step 6A: Optional one-command installer
+## Step 7A: Optional one-command installer
 
 If you want the Pi to do the package install, wheel install, SPI setup, service setup, and logging for you, run:
 
 ```bash
 cd ~/Piano-LED-Visualizer
-bash autiubstakkpiz2.sh --wheel /home/<your-user>/rpi_ws281x-5.0.0-cp311-cp311-linux_armv7l.whl
+bash autiubstakkpiz2.sh
 ```
 
 Notes:
 
 - the script is **verbose** and prints each step while it runs
 - it writes a full log to `install-logs/` inside the repo
-- it checks that the wheel is present before installing
+- it checks that a matching wheel is present before installing
+- it auto-detects the wheel from `wheelhouse/` in the repo if you bundled it there
 - it disables the Visualizer-managed hotspot by setting `is_hotspot_active` to `0`, so the Pi keeps using your normal Wi-Fi instead of trying to bring up `PianoLEDVisualizer`
 - if you do not need RTP-MIDI, add `--skip-rtpmidi`
 - after install, your live songs and settings will be under `~/Piano-LED-Visualizer/data/`
 
 If you use the script, you can skip the manual install steps below and jump to the reboot and verification section after it finishes.
 
-## Step 7: Install all precompiled runtime packages
+## Step 8: Install all precompiled runtime packages
 
 On the Pi:
 
@@ -224,17 +240,19 @@ sudo apt install -y \
   abcmidi
 ```
 
-## Step 8: Install the prebuilt `rpi_ws281x` wheel
+## Step 9: Install the prebuilt `rpi_ws281x` wheel
 
 On the Pi:
 
 ```bash
-sudo python3 -m pip install --break-system-packages --no-deps /home/<your-user>/rpi_ws281x-5.0.0-cp311-cp311-linux_armv7l.whl
+sudo python3 -m pip install --break-system-packages --no-deps ~/Piano-LED-Visualizer/wheelhouse/rpi_ws281x-5.0.0-cp311-cp311-linux_armv7l.whl
 ```
 
 This installs a wheel that was already compiled on your PC, so the Zero 2 W does not need to compile it.
 
-## Step 9: Enable SPI and disable onboard audio
+If you did not bundle the wheel in the repo, adjust the path to wherever you copied it on the Pi.
+
+## Step 10: Enable SPI and disable onboard audio
 
 Enable SPI:
 
@@ -258,7 +276,7 @@ else
 fi
 ```
 
-## Step 10: Optional RTP-MIDI support
+## Step 11: Optional RTP-MIDI support
 
 If you want RTP-MIDI, install `rtpmidid`:
 
@@ -270,7 +288,7 @@ sudo apt -f install -y
 rm -f rtpmidid_24.12.2_armhf.deb
 ```
 
-## Step 11: Create the systemd service
+## Step 12: Create the systemd service
 
 Create the service file:
 
@@ -301,7 +319,7 @@ sudo systemctl enable visualizer.service
 sudo systemctl restart visualizer.service
 ```
 
-## Step 12: Reboot and verify
+## Step 13: Reboot and verify
 
 Reboot:
 
@@ -322,7 +340,7 @@ If everything is right:
 - the LCD menu should appear if your display is connected
 - the web interface should become available after the app starts
 
-## Step 13: Open the web interface
+## Step 14: Open the web interface
 
 From Windows, try:
 

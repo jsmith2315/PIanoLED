@@ -114,6 +114,10 @@ find_wheel() {
   local candidate
   local -a search_dirs=(
     "$REPO_DIR"
+    "$REPO_DIR/wheelhouse"
+    "$REPO_DIR/rpi_ws281x-wheel"
+    "$REPO_DIR/rpi_ws281x-wheel/wheelhouse"
+    "$REPO_DIR/rpi_ws281x-wheel/wheelhouse/wheelhouse"
     "$PWD"
     "$INSTALL_HOME"
     "$INSTALL_HOME/wheelhouse"
