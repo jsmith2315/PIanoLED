@@ -34,7 +34,7 @@ The Piano LED Visualizer is a project that enables you to connect an LED strip t
 
   - Piano with MIDI or USB output
   - MIDI to USB interface (if your piano doesn't have USB output) [Amazon US](https://amzn.to/2nhsYBl) | [Amazon FR](https://amzn.to/3Ul5wAi) | [Aliexpress](https://s.click.aliexpress.com/e/_DBobxwH) (cheap midi interfaces might not work as intended, I recommend hardware from more known brands. I personally use iConnectivity mio 
-  - Raspberry Pi Zero WH [Amazon US](https://amzn.to/3D9hMdc) | [Amazon FR](https://amzn.to/3SDyxWA) | [Aliexpress](https://s.click.aliexpress.com/e/_dXc8jGl) | [Aliexpress #2](https://s.click.aliexpress.com/e/_DmR3jvb)
+  - Raspberry Pi Zero 2 W [Amazon US](https://amzn.to/3D9hMdc) | [Amazon FR](https://amzn.to/3SDyxWA) | [Aliexpress](https://s.click.aliexpress.com/e/_dXc8jGl) | [Aliexpress #2](https://s.click.aliexpress.com/e/_DmR3jvb)
   - MicroSD card (16 GB is more than enough, Class 10 recommended for faster loading) [Amazon US](https://amzn.to/2oR93cC) | [Amazon FR](https://amzn.to/480tZxM)) | [Aliexpress](https://s.click.aliexpress.com/e/_DdNW6lB)
   - USB OTG hub (At least two ports, for piano and computer/tablet connection) [Amazon US](https://amzn.to/3yVpdmV) | [Amazon FR](https://amzn.to/3HBY6kv) | [Aliexpress](https://s.click.aliexpress.com/e/_DBrYA2p)
   - WS2812B LED Strip (*at least 1.5m with 144 diodes/meter*)  [Amazon US](https://amzn.to/2JTFpuh) | [Amazon FR](https://amzn.to/3SBT0eh) | [Aliexpress](https://s.click.aliexpress.com/e/_DEEkJyR)
@@ -65,26 +65,20 @@ The Piano LED Visualizer is a project that enables you to connect an LED strip t
 **Total cost (excluding piano and tablet) should be 75-100 USD**
 *Disclosure: All of the links above are affiliate links, which means that without additional costs for you, I will earn a commission if you make a purchase by clicking through it.*
 
-## Software preparations
-There are two ways, you can use preconfigured system image or install everything manually.
+## Software installation
 
-### 1. **System image**
-- Download the latest zip file from releases.
-- Unzip the file.
-- Use program like [Win32 Disk Imager](https://sourceforge.net/projects/win32diskimager/) or [Etcher](https://www.balena.io/etcher/) to save system image to your SD card (4GB is a minimum).
+The supported install path is now:
 
-If you don't need to connect your RPi to Wi-Fi you can eject SD card from your PC and put it in Raspberry Pi. After 3-8 minutes *(depending on how fast your SD card is)* you should see Visualizer menu on RPi screen.  
+- **Raspberry Pi Zero 2 W**
+- **Raspberry Pi OS Lite Bookworm 32-bit**
+- install all runtime packages from `apt`
+- install `rpi_ws281x` from a **prebuilt wheel**
 
-For version 1.5 and above:
+Use the full step-by-step guide here:
 
-The Raspberry Pi sets up a Wi-Fi hotspot named 'PianoLEDVisualizer' with the password 'visualizer'. 
-Once connected, open your browser and go to "pianoledvisualizer.local" to access the web interface. 
-Use the "Network" tab there to link the Raspberry Pi to your regular network.
+- [Pi Zero 2 W installation guide](./instructions.md)
 
-You can also connect Raspberry Pi to your network [manually](https://github.com/onlaj/Piano-LED-Visualizer/blob/master/Docs/wifi_setup.md)
-
-### 2. **Manual installation**
-[Instructions](https://github.com/onlaj/Piano-LED-Visualizer/blob/master/Docs/manual_installation.md)
+The repo also includes `autiubstakkpiz2.sh` if you want the Pi to perform the package install, wheel install, SPI setup, hotspot disable, and service setup after you copy the prebuilt wheel onto it.
 
 ## Connecting LED Strip to Raspberry Pi
 There is no point to reinvent the wheel again, so here is a nice [diagram](https://web.archive.org/web/20230319222537/https://tutorials-raspberrypi.com/wp-content/uploads/2017/03/Raspberry-Pi-WS2812-Steckplatine.png).
@@ -128,11 +122,6 @@ Although in my tests I did not notice any deterioration in performance, if neces
 
 - In theory, yes. In practice many users reported problems with huge delay between key presses and lights reacting to it on Raspberrys other than Zero.
 
-**Q - What about Raspberry Pi Zero without Wi-Fi and bluetooth?**
-
-- If you are going only for the visuals and do not plan to use it with Synthesia you can save some bucks and buy cheaper, non-WH version of Zero. 
-Notice, that you won't be able to use web interface
-
 **Q - Can I use other screens or no screen at all?**
 
 - Currently, the only other supported screen is Waveshare LCD TFT 1,3". As for no screen, you can instead use web interface.
@@ -159,28 +148,21 @@ Notice, that you won't be able to use web interface
 
 For web interface: Open internet browser on device connected to the same network and type RPi's local address `pianoledvisualizer.local` Then from the menu on the left choose "songs management" tab.
 
-For SFTP: in any FTP program (like Filezilla) connect to your RPi local address (for example: sftp://192.168.1.10) and navigate to /home/<your-user>/Piano-LED-Visualizer/Songs.
+For SFTP: in any FTP program (like Filezilla) connect to your RPi local address (for example: sftp://192.168.1.10) and navigate to `/home/<your-user>/Piano-LED-Visualizer/data/Songs`.
 
 **Q - How do I update visualizer?**
 
-- **A** - From the Visualiser menu `Other Settings > Update visualizer > Confirm`. 
- 
+- **A** - From the Visualiser menu `Other Settings > Update visualizer > Confirm`.
+
 After the update, a reboot is required.
 
 - **B** - Connect to your console using SSH and type:
 
 `cd /home/<your-user>/Piano-LED-Visualizer`
-and then 
 
-`git pull origin master`
+`git pull origin main`
 
-If for some reasons it does not work try to remove whole project and clone it again.
-
-`cd /home`
-
-`sudo rm -rf Piano-LED-Visualizer`
-
-`sudo git clone https://github.com/onlaj/Piano-LED-Visualizer`
+Your local songs, presets, and runtime settings now live under `data/`, so they can stay in place across updates while the repo keeps `config/` and `Songs/` as built-in defaults.
 
 
 ![Image](https://i.imgur.com/9MgNUl5.jpg?1)

@@ -98,7 +98,7 @@ There are 3 modes
 ## Recording <a name="recording"></a>
 
 Visualizer can record your playing. When Multicolor mode is selected, it will record each color on separate midi file.
-Songs are saved into the "Songs" folder, they can be downloaded using the Web interface.
+Songs are saved into the runtime `data/Songs` folder and can be downloaded using the Web interface.
 
 ![learnmidi_pic](https://i.imgur.com/jAcR3kT.png)
 

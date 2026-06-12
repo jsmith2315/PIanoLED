@@ -7,6 +7,14 @@ This guide is for:
 - a **Windows PC**
 - building `rpi_ws281x` on the PC because the Zero 2 W should not compile it locally
 
+Runtime files created by the app now live under `data/` inside the repo:
+
+- `data/config/settings.xml` for live settings
+- `data/config/sequences.xml` for live sequences
+- `data/Songs/` for uploaded and recorded songs
+
+The original `config/` and `Songs/` folders stay in the repo as built-in defaults, so you can update the code without overwriting your local runtime data.
+
 ## Why this is the recommended path
 
 Use **Bookworm 32-bit**, not Trixie, for this project on a Zero 2 W.
@@ -183,6 +191,7 @@ Notes:
 - it checks that the wheel is present before installing
 - it disables the Visualizer-managed hotspot by setting `is_hotspot_active` to `0`, so the Pi keeps using your normal Wi-Fi instead of trying to bring up `PianoLEDVisualizer`
 - if you do not need RTP-MIDI, add `--skip-rtpmidi`
+- after install, your live songs and settings will be under `~/Piano-LED-Visualizer/data/`
 
 If you use the script, you can skip the manual install steps below and jump to the reboot and verification section after it finishes.
 
@@ -334,6 +343,20 @@ Restart the visualizer:
 ```bash
 sudo systemctl restart visualizer.service
 ```
+
+Pull the latest code:
+
+```bash
+git pull origin main
+```
+
+After a normal code-only update, restart the service:
+
+```bash
+sudo systemctl restart visualizer.service
+```
+
+You usually do not need to rerun the installer after every `git pull`. Rerun `autiubstakkpiz2.sh` if the install guide changes package requirements, you reflash the Pi, or you replace the `rpi_ws281x` wheel.
 
 View recent logs:
 

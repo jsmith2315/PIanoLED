@@ -116,7 +116,7 @@ class PlatformRasp(PlatformBase):
         call("sudo git clean -fdx -e data/ -e Songs/ -e "
              "config/settings.xml -e config/wpa_disable_ap.conf -e visualizer.log", shell=True)
         call("sudo git clean -fdx Songs/cache", shell=True)
-        call("sudo git pull origin master", shell=True)
+        call("sudo git pull origin main", shell=True)
         call("sudo apt-get install -y " + " ".join(RUNTIME_APT_PACKAGES), shell=True)
 
     @staticmethod
