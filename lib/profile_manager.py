@@ -3,6 +3,7 @@ import threading
 import os
 from typing import List, Dict, Optional
 from lib.log_setup import logger
+from lib.paths import DATA_ROOT, SONGS_DIR
 
 class ProfileManager:
     """Manage user profiles and per-song highscores.
@@ -12,16 +13,15 @@ class ProfileManager:
         highscores(id INTEGER PK, profile_id INTEGER, song_name TEXT, high_score INTEGER, UNIQUE(profile_id, song_name))
     """
 
-    def __init__(self, db_path: str = "profiles.db", songs_dir: str = "Songs"):
+    def __init__(self, db_path: str = "profiles.db", songs_dir: str = SONGS_DIR):
         # Resolve relative DB path into project 'data' directory so file is visible & persistent
         if not os.path.isabs(db_path):
-            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-            data_dir = os.path.join(project_root, 'data')
+            data_dir = DATA_ROOT
             try:
                 os.makedirs(data_dir, exist_ok=True)
             except OSError:
                 # Fallback: keep relative path if directory cannot be created
-                data_dir = os.path.abspath(project_root)
+                data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
             db_path = os.path.join(data_dir, db_path)
         self.db_path = db_path
         self.songs_dir = songs_dir

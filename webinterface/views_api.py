@@ -1,8 +1,16 @@
 from webinterface import webinterface, app_state
 from flask import render_template, send_file, request, jsonify
-from werkzeug.security import safe_join
 from lib.functions import (get_last_logs, find_between, fastColorWipe, play_midi, clamp, validate_schedule_overlaps)
 from lib.led_animations import get_registry
+from lib.paths import (
+    PRESETS_DIR,
+    SETTINGS_PATH,
+    SEQUENCES_PATH,
+    SONGS_DIR,
+    presets_path,
+    song_cache_path,
+    songs_path,
+)
 import lib.colormaps as cmap
 import psutil
 import threading
@@ -30,6 +38,14 @@ GPIO.setmode(GPIO.BCM)
 GPIO.setup(SENSECOVER, GPIO.IN, GPIO.PUD_UP)
 
 pid = psutil.Process(os.getpid())
+
+
+def song_file_path(name):
+    return songs_path(os.path.basename(name))
+
+
+def song_cache_file_path(name):
+    return song_cache_path(os.path.basename(name) + ".p")
 
 
 @webinterface.route('/api/start_animation', methods=['GET'])
@@ -633,43 +649,43 @@ def change_setting():
         return jsonify(success=True, reload_sequence=reload_sequence)
 
     if setting_name == "change_sequence_name":
-        sequences_tree = minidom.parse("config/sequences.xml")
+        sequences_tree = minidom.parse(SEQUENCES_PATH)
         sequence_to_edit = "sequence_" + str(value)
 
         sequences_tree.getElementsByTagName(sequence_to_edit)[
             0].getElementsByTagName("settings")[
             0].getElementsByTagName("sequence_name")[0].firstChild.nodeValue = str(second_value)
 
-        pretty_save("config/sequences.xml", sequences_tree)
+        pretty_save(SEQUENCES_PATH, sequences_tree)
 
         return jsonify(success=True, reload_sequence=reload_sequence)
 
     if setting_name == "change_step_value":
-        sequences_tree = minidom.parse("config/sequences.xml")
+        sequences_tree = minidom.parse(SEQUENCES_PATH)
         sequence_to_edit = "sequence_" + str(value)
 
         sequences_tree.getElementsByTagName(sequence_to_edit)[
             0].getElementsByTagName("settings")[
             0].getElementsByTagName("next_step")[0].firstChild.nodeValue = str(second_value)
 
-        pretty_save("config/sequences.xml", sequences_tree)
+        pretty_save(SEQUENCES_PATH, sequences_tree)
 
         return jsonify(success=True, reload_sequence=reload_sequence)
 
     if setting_name == "change_step_activation_method":
-        sequences_tree = minidom.parse("config/sequences.xml")
+        sequences_tree = minidom.parse(SEQUENCES_PATH)
         sequence_to_edit = "sequence_" + str(value)
 
         sequences_tree.getElementsByTagName(sequence_to_edit)[
             0].getElementsByTagName("settings")[
             0].getElementsByTagName("control_number")[0].firstChild.nodeValue = str(second_value)
 
-        pretty_save("config/sequences.xml", sequences_tree)
+        pretty_save(SEQUENCES_PATH, sequences_tree)
 
         return jsonify(success=True, reload_sequence=reload_sequence)
 
     if setting_name == "add_sequence":
-        sequences_tree = minidom.parse("config/sequences.xml")
+        sequences_tree = minidom.parse(SEQUENCES_PATH)
 
         sequences_amount = 1
         while True:
@@ -719,12 +735,12 @@ def change_setting():
 
         sequences_tree.getElementsByTagName("list")[0].appendChild(element)
 
-        pretty_save("config/sequences.xml", sequences_tree)
+        pretty_save(SEQUENCES_PATH, sequences_tree)
         app_state.ledsettings.incoming_setting_change = True
         return jsonify(success=True, reload_sequence=reload_sequence)
 
     if setting_name == "remove_sequence":
-        sequences_tree = minidom.parse("config/sequences.xml")
+        sequences_tree = minidom.parse(SEQUENCES_PATH)
 
         # removing sequence node
         nodes = sequences_tree.getElementsByTagName("sequence_" + str(value))
@@ -739,12 +755,12 @@ def change_setting():
                 sequences_tree.getElementsByTagName(sequence.nodeName)[0].tagName = "sequence_" + str(i)
                 i += 1
 
-        pretty_save("config/sequences.xml", sequences_tree)
+        pretty_save(SEQUENCES_PATH, sequences_tree)
         app_state.ledsettings.incoming_setting_change = True
         return jsonify(success=True, reload_sequence=reload_sequence)
 
     if setting_name == "add_step":
-        sequences_tree = minidom.parse("config/sequences.xml")
+        sequences_tree = minidom.parse(SEQUENCES_PATH)
 
         step_amount = 1
         while True:
@@ -778,7 +794,7 @@ def change_setting():
 
         sequences_tree.getElementsByTagName("sequence_" + str(value))[0].appendChild(step)
 
-        pretty_save("config/sequences.xml", sequences_tree)
+        pretty_save(SEQUENCES_PATH, sequences_tree)
         app_state.ledsettings.incoming_setting_change = True
         return jsonify(success=True, reload_sequence=reload_sequence, reload_steps_list=True,
                        set_sequence_step_number=step_amount)
@@ -789,7 +805,7 @@ def change_setting():
         second_value = int(second_value)
         second_value += 1
 
-        sequences_tree = minidom.parse("config/sequences.xml")
+        sequences_tree = minidom.parse(SEQUENCES_PATH)
 
         # removing step node
         nodes = sequences_tree.getElementsByTagName("sequence_" + str(value))[0].getElementsByTagName(
@@ -806,7 +822,7 @@ def change_setting():
                     0].tagName = "step_" + str(i)
                 i += 1
 
-        pretty_save("config/sequences.xml", sequences_tree)
+        pretty_save(SEQUENCES_PATH, sequences_tree)
         app_state.ledsettings.incoming_setting_change = True
         return jsonify(success=True, reload_sequence=reload_sequence, reload_steps_list=True)
 
@@ -814,7 +830,7 @@ def change_setting():
     if setting_name == "save_led_settings_to_step" and second_value != "":
 
         # remove node and child under "sequence_" + str(value) and "step_" + str(second_value)
-        sequences_tree = minidom.parse("config/sequences.xml")
+        sequences_tree = minidom.parse(SEQUENCES_PATH)
 
         second_value = int(second_value)
         second_value += 1
@@ -1062,7 +1078,7 @@ def change_setting():
         except:
             sequences_tree.getElementsByTagName("sequence_" + str(value))[0].appendChild(step)
 
-        pretty_save("config/sequences.xml", sequences_tree)
+        pretty_save(SEQUENCES_PATH, sequences_tree)
 
         app_state.ledsettings.incoming_setting_change = True
 
@@ -1185,39 +1201,41 @@ def change_setting():
         return jsonify(success=True)
 
     if setting_name == "change_song_name":
-        if os.path.exists("Songs/" + second_value):
+        if os.path.exists(song_file_path(second_value)):
             return jsonify(success=False, reload_songs=True, error=second_value + " already exists")
 
         if "_main" in value:
             search_name = value.replace("_main.mid", "")
-            for fname in os.listdir('Songs'):
+            for fname in os.listdir(SONGS_DIR):
                 if search_name in fname:
                     new_name = second_value.replace(".mid", "") + fname.replace(search_name, "")
-                    os.rename('Songs/' + fname, 'Songs/' + new_name)
+                    os.rename(song_file_path(fname), song_file_path(new_name))
         else:
-            os.rename('Songs/' + value, 'Songs/' + second_value)
-            os.rename('Songs/cache/' + value + ".p", 'Songs/cache/' + second_value + ".p")
+            os.rename(song_file_path(value), song_file_path(second_value))
+            cache_path = song_cache_file_path(value)
+            if os.path.exists(cache_path):
+                os.rename(cache_path, song_cache_file_path(second_value))
 
         return jsonify(success=True, reload_songs=True)
 
     if setting_name == "remove_song":
         if "_main" in value:
             name_no_suffix = value.replace("_main.mid", "")
-            for fname in os.listdir('Songs'):
+            for fname in os.listdir(SONGS_DIR):
                 if name_no_suffix in fname:
-                    os.remove("Songs/" + fname)
+                    os.remove(song_file_path(fname))
         else:
-            os.remove("Songs/" + value)
+            os.remove(song_file_path(value))
 
             file_types = [".musicxml", ".xml", ".mxl", ".abc"]
             for file_type in file_types:
                 try:
-                    os.remove("Songs/" + value.replace(".mid", file_type))
+                    os.remove(song_file_path(value.replace(".mid", file_type)))
                 except:
                     pass
 
             try:
-                os.remove("Songs/cache/" + value + ".p")
+                os.remove(song_cache_file_path(value))
             except:
                 logger.info("No cache file for " + value)
 
@@ -1225,25 +1243,26 @@ def change_setting():
 
     if setting_name == "download_song":
         if "_main" in value:
-            zipObj = ZipFile("Songs/" + value.replace(".mid", "") + ".zip", 'w')
+            zip_path = song_file_path(value.replace(".mid", "") + ".zip")
+            zipObj = ZipFile(zip_path, 'w')
             name_no_suffix = value.replace("_main.mid", "")
             songs_count = 0
-            for fname in os.listdir('Songs'):
+            for fname in os.listdir(SONGS_DIR):
                 if name_no_suffix in fname and ".zip" not in fname:
                     songs_count += 1
-                    zipObj.write("Songs/" + fname)
+                    zipObj.write(song_file_path(fname), arcname=fname)
             zipObj.close()
             if songs_count == 1:
-                os.remove("Songs/" + value.replace(".mid", "") + ".zip")
-                return send_file(safe_join("../Songs/" + value), mimetype='application/x-csv',
+                os.remove(zip_path)
+                return send_file(song_file_path(value), mimetype='application/x-csv',
                                  download_name=value,
                                  as_attachment=True)
             else:
-                return send_file(safe_join("../Songs/" + value.replace(".mid", "")) + ".zip",
+                return send_file(zip_path,
                                  mimetype='application/x-csv',
                                  download_name=value.replace(".mid", "") + ".zip", as_attachment=True)
         else:
-            return send_file(safe_join("../Songs/" + value), mimetype='application/x-csv', download_name=value,
+            return send_file(song_file_path(value), mimetype='application/x-csv', download_name=value,
                              as_attachment=True)
 
     if setting_name == "download_sheet_music":
@@ -1252,14 +1271,14 @@ def change_setting():
         while i < len(file_types):
             try:
                 new_name = value.replace(".mid", file_types[i])
-                return send_file(safe_join("../Songs/" + new_name), mimetype='application/x-csv',
+                return send_file(song_file_path(new_name), mimetype='application/x-csv',
                                  download_name=new_name,
                                  as_attachment=True)
             except:
                 i += 1
         app_state.learning.convert_midi_to_abc(value)
         try:
-            return send_file(safe_join("../Songs/", value.replace(".mid", ".abc")), mimetype='application/x-csv',
+            return send_file(song_file_path(value.replace(".mid", ".abc")), mimetype='application/x-csv',
                              download_name=value.replace(".mid", ".abc"), as_attachment=True)
         except:
             logger.warning("Converting failed")
@@ -2090,7 +2109,7 @@ def get_songs():
 
     songs_list_dict = {}
 
-    path = 'Songs/'
+    path = SONGS_DIR
     songs_list = os.listdir(path)
     songs_list = [os.path.join(path, i) for i in songs_list]
 
@@ -2109,18 +2128,19 @@ def get_songs():
     total_songs = 0
 
     for song in songs_list:
-        if "_#" in song or not song.endswith('.mid'):
+        song_name = os.path.basename(song)
+        if "_#" in song_name or not song_name.endswith('.mid'):
             continue
         if search:
-            if search.lower() not in song.lower():
+            if search.lower() not in song_name.lower():
                 continue
         total_songs += 1
 
     max_page = int(math.ceil(total_songs / int(length)))
 
     for song in songs_list:
-        song = song.replace("Songs/", "")
-        date = os.path.getmtime("Songs/" + song)
+        song = os.path.basename(song)
+        date = os.path.getmtime(song_file_path(song))
         if "_#" in song or not song.endswith('.mid'):
             continue
 
@@ -2169,7 +2189,7 @@ def switch_ports():
 def get_sequences():
     response = {}
     sequences_list = []
-    sequences_tree = minidom.parse("config/sequences.xml")
+    sequences_tree = minidom.parse(SEQUENCES_PATH)
     i = 0
     while True:
         try:
@@ -2190,7 +2210,7 @@ def get_sequences():
 def get_steps_list():
     response = {}
     sequence = request.args.get('sequence')
-    sequences_tree = minidom.parse("config/sequences.xml")
+    sequences_tree = minidom.parse(SEQUENCES_PATH)
     steps_list = []
     i = 0
 
@@ -2565,9 +2585,6 @@ def api_set_current_profile():
 @webinterface.route('/api/get_current_profile', methods=['GET'])
 def api_get_current_profile():
     return jsonify(success=True, profile_id=app_state.current_profile_id)
-# Presets API
-PRESETS_DIR = "config/presets"
-
 # LED settings that should be included in presets (Color Modes, Light Modes, Brightness only)
 LED_SETTINGS_ALLOWLIST = {
     # Color Mode Settings
@@ -2619,7 +2636,7 @@ def save_preset():
         
     # Sanitize name
     name = os.path.basename(name)
-    path = os.path.join(PRESETS_DIR, name)
+    path = presets_path(name)
     
     # Ensure presets directory exists
     try:
@@ -2633,7 +2650,7 @@ def save_preset():
         app_state.usersettings.save_changes()
         
         # Load current settings
-        current_tree = ET.parse("config/settings.xml")
+        current_tree = ET.parse(SETTINGS_PATH)
         current_root = current_tree.getroot()
         
         # Create new preset XML with only LED settings
@@ -2661,7 +2678,7 @@ def load_preset():
     if not name:
         return jsonify(success=False, error="Name is required")
         
-    path = os.path.join(PRESETS_DIR, os.path.basename(name))
+    path = presets_path(os.path.basename(name))
     if not os.path.exists(path):
         return jsonify(success=False, error="Preset not found")
         
@@ -2671,7 +2688,7 @@ def load_preset():
         preset_root = preset_tree.getroot()
         
         # Load current settings
-        current_tree = ET.parse("config/settings.xml")
+        current_tree = ET.parse(SETTINGS_PATH)
         current_root = current_tree.getroot()
         
         # Helper to find or create element in current root
@@ -2688,7 +2705,7 @@ def load_preset():
                 current_elem = get_or_create(current_root, preset_elem.tag)
                 current_elem.text = preset_elem.text
             
-        current_tree.write("config/settings.xml")
+        current_tree.write(SETTINGS_PATH)
         
         # Reload application state
         reload_app_state()
@@ -2705,7 +2722,7 @@ def delete_preset():
     if not name:
         return jsonify(success=False, error="Name is required")
         
-    path = os.path.join(PRESETS_DIR, os.path.basename(name))
+    path = presets_path(os.path.basename(name))
     if os.path.exists(path):
         os.remove(path)
         return jsonify(success=True)
@@ -2723,8 +2740,8 @@ def rename_preset():
     if not new_name.endswith('.xml'):
         new_name += '.xml'
         
-    old_path = os.path.join(PRESETS_DIR, os.path.basename(old_name))
-    new_path = os.path.join(PRESETS_DIR, os.path.basename(new_name))
+    old_path = presets_path(os.path.basename(old_name))
+    new_path = presets_path(os.path.basename(new_name))
     
     if os.path.exists(old_path):
         if os.path.exists(new_path):

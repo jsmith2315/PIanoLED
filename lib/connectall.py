@@ -3,6 +3,7 @@ import subprocess
 import sys
 import os
 from xml.etree import ElementTree as ET
+from lib.paths import SETTINGS_PATH
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -20,6 +21,7 @@ def connectall(usersettings=None):
         # Read settings from config file directly
         # Try multiple possible locations for the settings file
         settings_paths = [
+            SETTINGS_PATH,
             "config/settings.xml",  # When called from app directory
             os.path.join(REPO_ROOT, "config/settings.xml"),  # When called from repository path
             os.path.expanduser("~/Piano-LED-Visualizer/config/settings.xml"),  # Common user install path

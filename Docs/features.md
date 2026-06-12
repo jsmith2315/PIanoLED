@@ -194,10 +194,10 @@ You can upload songs through the Web interface
 
 ![learnmidi_pic](https://i.imgur.com/3QxBxgB.png)
 
-In case of upload errors, use [Putty](https://www.putty.org/) or other app to connect to your RPi throught SSH to change the access permissions for the `Songs` folder:
+In case of upload errors, use [Putty](https://www.putty.org/) or other app to connect to your RPi throught SSH to change the access permissions for the runtime `data/Songs` folder:
 ```
 cd /home/Piano-LED-Visualizer/
-sudo chmod a+rwxX -R Songs/
+sudo chmod a+rwxX -R data/Songs/
 ```
 
 
@@ -208,7 +208,7 @@ sudo chmod a+rwxX -R Songs/
 In the visualizer menu and in the web interface you can find a setting called "Sequences".
 It allows you to change led properties while playing using the third key on Waveshare hat, your piano pedals,
 or by clicking "next step"/pressing space in the Web interface.
-You can edit or create new sequences by editing the "sequences.xml" file or through Web interface.
+You can edit or create new sequences by editing `data/config/sequences.xml` or through Web interface.
 The "control_number" defines which pedal is used to go to the next step.
 
 | Control number | Pedal name                         |

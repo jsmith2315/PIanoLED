@@ -109,7 +109,7 @@ If you don't have a 3d printer, try to find some company or private person who w
 The visualizer comes with a web interface with which you can control the colors of the LED strip, change port settings, run animations of the strip, control sequences and manage midi files, including downloading, uploading, renaming, deleting, and playing.
 
 To connect to the web interface, type the local address of your raspberry pi in the browser, for example [http://192.168.1.10](http://192.168.1.10)
-Both devices must be connected to the same network. By default, web interface works on port 80 through any available IP address, but if needed it can be changed in `config/settings.xml`:
+Both devices must be connected to the same network. By default, web interface works on port 80 through any available IP address, but if needed it can be changed in `data/config/settings.xml` at runtime. The original `config/` files remain in the repo as the built-in defaults:
 
     <web_listen_ip>192.168.1.10</web_listen_ip>
     <web_listen_port>80</web_listen_port>

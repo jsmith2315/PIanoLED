@@ -3,6 +3,7 @@ import time
 from xml.dom import minidom
 
 from lib.functions import fastColorWipe, find_between, clamp
+from lib.paths import SEQUENCES_PATH
 from lib.rpi_drivers import Color
 
 
@@ -325,7 +326,7 @@ class LedSettings:
                     self.step_number = int(step) + 1
                 else:
                     self.step_number = 1
-                self.sequences_tree = minidom.parse("config/sequences.xml")
+                self.sequences_tree = minidom.parse(SEQUENCES_PATH)
 
                 self.sequence_number = str(int(sequence) + 1)
 

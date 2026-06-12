@@ -2,11 +2,13 @@ from flask import Flask
 import asyncio
 import websockets
 from lib.functions import get_ip_address
+from lib.paths import SONGS_DIR, ensure_data_layout
 import json
 from collections import deque
 from lib.log_setup import logger
 
-UPLOAD_FOLDER = 'Songs/'
+ensure_data_layout()
+UPLOAD_FOLDER = SONGS_DIR
 
 webinterface = Flask(__name__,
                      static_folder='static',

@@ -13,6 +13,7 @@ import random
 from lib.log_setup import logger
 import os
 import json
+from lib.paths import LOG_PATH, songs_path
 
 SENSECOVER = 12
 GPIO.setmode(GPIO.BCM)
@@ -33,7 +34,7 @@ def get_ip_address():
 
 
 def get_last_logs(n=100):
-    file_path = 'visualizer.log'
+    file_path = LOG_PATH
     # If the file does not exist, create it with write permissions
     if not os.path.exists(file_path):
         open(file_path, 'w').close()
@@ -97,7 +98,7 @@ def play_midi(song_path, midiports, saving, menu, ledsettings, ledstrip):
     saving.t = threading.currentThread()
 
     try:
-        mid = mido.MidiFile("Songs/" + song_path)
+        mid = mido.MidiFile(songs_path(song_path))
         fastColorWipe(strip, True, ledsettings)
         # length = mid.length
         t0 = False

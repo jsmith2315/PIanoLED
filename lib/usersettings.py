@@ -2,10 +2,12 @@ from xml.etree import ElementTree as ET
 import time
 from functools import reduce
 from lib.log_setup import logger
+from lib.paths import SETTINGS_PATH, DEFAULT_SETTINGS_PATH, ensure_data_layout
 
 
 class UserSettings:
-    def __init__(self, config="config/settings.xml", default_config="config/default_settings.xml"):
+    def __init__(self, config=SETTINGS_PATH, default_config=DEFAULT_SETTINGS_PATH):
+        ensure_data_layout()
         self.cache = {}
 
         self.CONFIG_FILE = config

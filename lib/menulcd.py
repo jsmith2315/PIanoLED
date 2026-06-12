@@ -6,6 +6,7 @@ from PIL import ImageFont, Image, ImageDraw
 import time
 from lib import LCD_Config, LCD_1in44, LCD_1in3
 from lib.functions import *
+from lib.paths import SEQUENCES_PATH
 from lib.rpi_drivers import GPIO
 import lib.colormaps as cmap
 from lib.log_setup import logger
@@ -390,7 +391,7 @@ class MenuLCD:
         mc.parentNode.parentNode.replaceChild(seq_mc, mc.parentNode)
         ret = True
         try:
-            sequences_tree = minidom.parse("config/sequences.xml")
+            sequences_tree = minidom.parse(SEQUENCES_PATH)
             self.update_songs()
             i = 0
             while True:

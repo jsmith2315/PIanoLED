@@ -1,6 +1,7 @@
 import time
 
 from mido import MidiFile, MidiTrack, Message
+from lib.paths import songs_path
 
 
 class SaveMIDI:
@@ -68,7 +69,7 @@ class SaveMIDI:
                                 time=int(time_delay * 40000)))
                 self.last_note_time = message[1]
 
-            self.mid.save('Songs/' + filename + '_' + str(key) + '.mid')
+            self.mid.save(songs_path(filename + '_' + str(key) + '.mid'))
 
         self.messages_to_save = []
         self.is_recording = False

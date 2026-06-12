@@ -21,6 +21,7 @@ from lib.rpi_drivers import Color
 import numpy as np
 import pickle
 from lib.log_setup import logger
+from lib.paths import SCORE_LOG_PATH, song_cache_path, songs_path
 from lib.score_manager import ScoreManager
 from webinterface import app_state
 
@@ -31,7 +32,7 @@ from logging.handlers import RotatingFileHandler
 score_logger = logging.getLogger("score_logger")
 score_logger.setLevel(logging.INFO)
 score_logger.propagate = False
-file_handler = RotatingFileHandler("score_log.txt", maxBytes=5000000, backupCount=3)
+file_handler = RotatingFileHandler(SCORE_LOG_PATH, maxBytes=5000000, backupCount=3)
 file_handler.setLevel(logging.INFO)
 formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 file_handler.setFormatter(formatter)
@@ -200,9 +201,10 @@ class LearnMIDI:
     def load_song_from_cache(self, song_path):
         # Load song from cache
         try:
-            if os.path.isfile('Songs/cache/' + song_path + '.p'):
+            cache_path = song_cache_path(song_path + '.p')
+            if os.path.isfile(cache_path):
                 logger.info("Loading song from cache")
-                with open('Songs/cache/' + song_path + '.p', 'rb') as handle:
+                with open(cache_path, 'rb') as handle:
                     cache = pickle.load(handle)
                     self.song_tempo = cache['song_tempo']
                     self.ticks_per_beat = cache['ticks_per_beat']
@@ -267,7 +269,7 @@ class LearnMIDI:
 
         try:
             # Load the midi file
-            mid = mido.MidiFile('Songs/' + song_path, clip=True)  # clip=True fixes some midi files
+            mid = mido.MidiFile(songs_path(song_path), clip=True)  # clip=True fixes some midi files
 
             # Get tempo and Ticks per beat
             self.song_tempo = get_tempo(mid)
@@ -299,7 +301,7 @@ class LearnMIDI:
             fastColorWipe(self.ledstrip.strip, True, self.ledsettings)
 
             # Save to cache
-            with open('Songs/cache/' + song_path + '.p', 'wb') as handle:
+            with open(song_cache_path(song_path + '.p'), 'wb') as handle:
                 cache = {'song_tempo': self.song_tempo, 'ticks_per_beat': self.ticks_per_beat,
                          'notes_time': self.notes_time, 'song_tracks': self.song_tracks, }
                 pickle.dump(cache, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -758,11 +760,13 @@ class LearnMIDI:
                     score_logger.error(f"Error preparing/sending session summary: {e}")
 
     def convert_midi_to_abc(self, midi_file):
-        if not os.path.isfile('Songs/' + midi_file.replace(".mid", ".abc")):
-            # subprocess.call(['midi2abc',  'Songs/' + midi_file, '-o', 'Songs/' + midi_file.replace(".mid", ".abc")])
+        midi_path = songs_path(midi_file)
+        abc_path = songs_path(midi_file.replace(".mid", ".abc"))
+        if not os.path.isfile(abc_path):
+            # subprocess.call(['midi2abc', midi_path, '-o', abc_path])
             try:
                 subprocess.check_output(
-                    ['midi2abc', 'Songs/' + midi_file, '-o', 'Songs/' + midi_file.replace(".mid", ".abc")])
+                    ['midi2abc', midi_path, '-o', abc_path])
             except Exception as e:
                 # check if e contains the string 'No such file or directory'
                 if 'No such file or directory' in str(e):

@@ -241,8 +241,17 @@ disable_audio() {
 }
 
 disable_visualizer_hotspot() {
-  local settings_file="$REPO_DIR/config/settings.xml"
+  local settings_file="$REPO_DIR/data/config/settings.xml"
   local default_file="$REPO_DIR/config/default_settings.xml"
+
+  if [[ ! -f "$settings_file" ]]; then
+    run mkdir -p "$(dirname "$settings_file")"
+    if [[ -f "$REPO_DIR/config/settings.xml" ]]; then
+      run cp "$REPO_DIR/config/settings.xml" "$settings_file"
+    else
+      run cp "$default_file" "$settings_file"
+    fi
+  fi
 
   if [[ ! -f "$settings_file" ]]; then
     run cp "$default_file" "$settings_file"

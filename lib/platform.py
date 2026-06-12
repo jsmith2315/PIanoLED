@@ -113,7 +113,7 @@ class PlatformRasp(PlatformBase):
     def update_visualizer():
         call("sudo git reset --hard HEAD", shell=True)
         call("sudo git checkout .", shell=True)
-        call("sudo git clean -fdx -e Songs/ -e "
+        call("sudo git clean -fdx -e data/ -e Songs/ -e "
              "config/settings.xml -e config/wpa_disable_ap.conf -e visualizer.log", shell=True)
         call("sudo git clean -fdx Songs/cache", shell=True)
         call("sudo git pull origin master", shell=True)

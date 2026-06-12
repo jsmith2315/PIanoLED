@@ -1,6 +1,7 @@
 from webinterface import webinterface, app_state
 from flask import render_template, request, jsonify
 import os
+from lib.paths import songs_path
 
 import time
 
@@ -76,7 +77,7 @@ def upload_file():
             return jsonify(success=False, error="no file")
         file = request.files['file']
         filename = file.filename
-        if os.path.exists("Songs/" + filename):
+        if os.path.exists(songs_path(filename)):
             return jsonify(success=False, error="file already exists", song_name=filename)
         if not allowed_file(file.filename):
             return jsonify(success=False, error="not a midi file", song_name=filename)

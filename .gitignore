@@ -2,6 +2,7 @@
 *.pyo
 .idea/
 config/settings.xml
+data/
 webinterface/node_modules
 visualizer.log
 
