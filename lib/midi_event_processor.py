@@ -2,7 +2,7 @@ import time
 
 from rpi_ws281x import Color
 
-from lib.functions import get_note_position, find_between
+from lib.functions import get_note_position, find_between, is_black_key, get_black_key_color
 from lib.log_setup import logger
 
 # Import app_state to check practice_active flag
@@ -35,6 +35,11 @@ class MIDIEventProcessor:
         self.last_sustain = 0  # Track sustain pedal state
         # Time tracking for sequence advancement to prevent rapid triggering
         self.last_sequence_advance = 0
+
+    def _get_note_display_rgb(self, note, default_rgb):
+        if self.ledsettings.black_key_color_enabled and is_black_key(note):
+            return get_black_key_color(self.ledsettings)
+        return default_rgb
 
     def process_midi_events(self):
         """
@@ -220,6 +225,7 @@ class MIDIEventProcessor:
             red, green, blue = color
         else:
             red, green, blue = (0, 0, 0)
+        red, green, blue = self._get_note_display_rgb(msg.note, (red, green, blue))
 
         # Store the note color
         self.ledstrip.keylist_color[note_position] = [red, green, blue]
@@ -274,6 +280,7 @@ class MIDIEventProcessor:
                     hand_color = self.learning.hand_colorL
 
                 red, green, blue = map(int, self.learning.hand_colorList[hand_color])
+                red, green, blue = self._get_note_display_rgb(msg.note, (red, green, blue))
                 s_color = Color(red, green, blue)
                 self.ledstrip.strip.setPixelColor(note_position, s_color)
                 self.ledstrip.set_adjacent_colors(note_position, s_color, False)
@@ -284,6 +291,7 @@ class MIDIEventProcessor:
             
             if self.ledsettings.skipped_notes != "Normal":
                 # Apply standard note color with velocity-based brightness
+                red, green, blue = self._get_note_display_rgb(msg.note, (red, green, blue))
                 s_color = Color(int(int(red) / float(brightness)), int(int(green) / float(brightness)),
                                 int(int(blue) / float(brightness)))
                 self.ledstrip.strip.setPixelColor(note_position, s_color)

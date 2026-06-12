@@ -336,6 +336,22 @@ def change_setting():
         app_state.ledsettings.adjacent_mode = value
         app_state.usersettings.change_setting_value("adjacent_mode", value)
 
+    if setting_name == "black_key_color_enabled":
+        enabled = int(value == 'true')
+        app_state.ledsettings.black_key_color_enabled = enabled
+        app_state.usersettings.change_setting_value("black_key_color_enabled", enabled)
+
+    if setting_name == "black_key_color":
+        rgb = wc.hex_to_rgb("#" + value)
+
+        app_state.ledsettings.black_key_red = rgb[0]
+        app_state.ledsettings.black_key_green = rgb[1]
+        app_state.ledsettings.black_key_blue = rgb[2]
+
+        app_state.usersettings.change_setting_value("black_key_red", rgb[0])
+        app_state.usersettings.change_setting_value("black_key_green", rgb[1])
+        app_state.usersettings.change_setting_value("black_key_blue", rgb[2])
+
     if setting_name == "input_port":
         app_state.usersettings.change_setting_value("input_port", value)
         app_state.midiports.change_port("inport", value)
@@ -1881,6 +1897,10 @@ def get_settings():
     sides_green = app_state.usersettings.get_setting_value("adjacent_green")
     sides_blue = app_state.usersettings.get_setting_value("adjacent_blue")
     sides_color = wc.rgb_to_hex((int(sides_red), int(sides_green), int(sides_blue)))
+    black_key_red = app_state.usersettings.get_setting_value("black_key_red")
+    black_key_green = app_state.usersettings.get_setting_value("black_key_green")
+    black_key_blue = app_state.usersettings.get_setting_value("black_key_blue")
+    black_key_color = wc.rgb_to_hex((int(black_key_red), int(black_key_green), int(black_key_blue)))
 
     light_mode = app_state.usersettings.get_setting_value("mode")
     # Get mode-specific speed
@@ -1917,6 +1937,8 @@ def get_settings():
 
     response["sides_color_mode"] = app_state.usersettings.get_setting_value("adjacent_mode")
     response["sides_color"] = sides_color
+    response["black_key_color_enabled"] = app_state.usersettings.get_setting_value("black_key_color_enabled")
+    response["black_key_color"] = black_key_color
 
     response["input_port"] = app_state.usersettings.get_setting_value("input_port")
     response["play_port"] = app_state.usersettings.get_setting_value("play_port")
@@ -2571,6 +2593,7 @@ LED_SETTINGS_ALLOWLIST = {
     # Other LED Settings
     'backlight_red', 'backlight_green', 'backlight_blue',
     'adjacent_mode', 'adjacent_red', 'adjacent_green', 'adjacent_blue',
+    'black_key_color_enabled', 'black_key_red', 'black_key_green', 'black_key_blue',
     'led_animation', 'led_animation_delay', 'led_animation_speed',
     'animation_speed_slow', 'animation_speed_medium', 'animation_speed_fast',
     'led_gamma',

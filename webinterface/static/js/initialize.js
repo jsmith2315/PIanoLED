@@ -266,6 +266,11 @@ function initialize_led_settings() {
             change_setting("sides_color_mode", this.value)
             document.getElementById('sides_color_choose').hidden = this.value !== "RGB";
         }
+
+        document.getElementById('black_key_color_enabled').onchange = function () {
+            change_setting("black_key_color_enabled", this.checked);
+            document.getElementById('black_key_color_choose').hidden = !this.checked;
+        }
     }
 
     document.getElementById('fading_speed').onchange = function () {

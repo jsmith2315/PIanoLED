@@ -76,6 +76,10 @@ class LedSettings:
         self.adjacent_red = int(us.get_setting_value("adjacent_red"))
         self.adjacent_green = int(us.get_setting_value("adjacent_green"))
         self.adjacent_blue = int(us.get_setting_value("adjacent_blue"))
+        self.black_key_color_enabled = int(us.get_setting_value("black_key_color_enabled") or 0)
+        self.black_key_red = int(us.get_setting_value("black_key_red") or 0)
+        self.black_key_green = int(us.get_setting_value("black_key_green") or 170)
+        self.black_key_blue = int(us.get_setting_value("black_key_blue") or 255)
 
         self.skipped_notes = us.get_setting_value("skipped_notes")
 

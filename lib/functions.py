@@ -18,6 +18,8 @@ SENSECOVER = 12
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(SENSECOVER, GPIO.IN, GPIO.PUD_UP)
 
+BLACK_KEY_PITCH_CLASSES = {1, 3, 6, 8, 10}
+
 
 def get_ip_address():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -62,6 +64,18 @@ def find_between(s, start, end):
 
 def clamp(val, val_min, val_max):
     return max(val_min, min(val, val_max))
+
+
+def is_black_key(note):
+    return int(note) % 12 in BLACK_KEY_PITCH_CLASSES
+
+
+def get_black_key_color(ledsettings):
+    return (
+        int(ledsettings.black_key_red),
+        int(ledsettings.black_key_green),
+        int(ledsettings.black_key_blue),
+    )
 
 
 def shift(lst, num_shifts):

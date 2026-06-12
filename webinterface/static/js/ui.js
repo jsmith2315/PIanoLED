@@ -586,10 +586,13 @@ function get_settings(home = true) {
                     document.getElementById("backlight_color").value = response["backlight_color"];
                     document.getElementById("sides_color").value = response["sides_color"];
                     document.getElementById("sides_color_mode").value = response["sides_color_mode"];
+                    document.getElementById("black_key_color").value = response["black_key_color"];
+                    document.getElementById("black_key_color_enabled").checked = response["black_key_color_enabled"] === "1";
 
                     if (response["sides_color_mode"] !== "RGB") {
                         document.getElementById('sides_color_choose').hidden = true;
                     }
+                    document.getElementById('black_key_color_choose').hidden = response["black_key_color_enabled"] !== "1";
 
                     document.getElementById("brightness").value = response["brightness"];
                     document.getElementById("brightness_percent").value = response["brightness"] + "%";
@@ -605,6 +608,7 @@ function get_settings(home = true) {
                     document.getElementById("shift").value = response["led_shift"];
                     document.getElementById("reverse").value = response["led_reverse"];
                     document.getElementById("sides_color").dispatchEvent(new Event('input'));
+                    document.getElementById("black_key_color").dispatchEvent(new Event('input'));
                     document.getElementById("backlight_color").dispatchEvent(new Event('input'));
                 }
 

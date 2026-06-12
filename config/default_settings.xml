@@ -78,6 +78,11 @@
 	<adjacent_green>255</adjacent_green>
 	<adjacent_blue>255</adjacent_blue>
 
+	<black_key_color_enabled>0</black_key_color_enabled>
+	<black_key_red>0</black_key_red>
+	<black_key_green>170</black_key_green>
+	<black_key_blue>255</black_key_blue>
+
 	<skipped_notes>None</skipped_notes>
 
 	<note_offsets>[[92, 2], [55, 1]]</note_offsets>
