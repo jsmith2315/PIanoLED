@@ -729,26 +729,49 @@
     }
 
     let touchstartX = 0;
+    let touchstartY = 0;
     let touchendX = 0;
+    let touchendY = 0;
     const slider = document.getElementById('slider');
+    const SWIPE_THRESHOLD = 100;
+    const EDGE_SWIPE_ZONE = 40;
 
     function difference(a, b) {
         return Math.abs(a - b);
     }
 
     function handleGesture() {
-        if (difference(touchendX, touchstartX) > 100) {
-            if (touchendX < touchstartX) document.getElementById('close_sidebar').click();
-            if (touchendX > touchstartX) document.getElementById('open_sidebar').click();
+        const horizontalDistance = touchendX - touchstartX;
+        const verticalDistance = touchendY - touchstartY;
+        const absHorizontalDistance = Math.abs(horizontalDistance);
+        const absVerticalDistance = Math.abs(verticalDistance);
+        const sidebarElement = document.querySelector('[x-data]');
+        const isSidebarOpen = sidebarElement && sidebarElement.__x
+            ? sidebarElement.__x.$data.isSidebarOpen
+            : false;
+
+        // Ignore normal scrolling and require a clearly horizontal swipe.
+        if (absHorizontalDistance < SWIPE_THRESHOLD || absHorizontalDistance <= absVerticalDistance) {
+            return;
         }
+
+        // Only allow opening from the left screen edge to avoid accidental opens while scrolling.
+        if (horizontalDistance > 0 && !isSidebarOpen && touchstartX > EDGE_SWIPE_ZONE) {
+            return;
+        }
+
+        if (horizontalDistance < 0) document.getElementById('close_sidebar').click();
+        if (horizontalDistance > 0) document.getElementById('open_sidebar').click();
     }
 
     slider.addEventListener('touchstart', e => {
         touchstartX = e.changedTouches[0].screenX;
+        touchstartY = e.changedTouches[0].screenY;
     });
 
     slider.addEventListener('touchend', e => {
         touchendX = e.changedTouches[0].screenX;
+        touchendY = e.changedTouches[0].screenY;
         if (e.target.type !== "range" && e.target.nodeName !== "TD"
             && e.target.nodeName !== "TABLE" && e.target.nodeName !== "TH" && e.target.nodeName !== "TR") {
             handleGesture();
