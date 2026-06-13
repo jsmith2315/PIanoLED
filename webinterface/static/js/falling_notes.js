@@ -51,6 +51,11 @@
         return [1, 3, 6, 8, 10].includes(note % 12);
     }
 
+    function getNoteName(note) {
+        const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        return noteNames[((note % 12) + 12) % 12];
+    }
+
     function formatSongName(songName) {
         if (!songName) {
             return 'No song loaded';
@@ -239,6 +244,16 @@
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
                 ctx.lineWidth = 2;
                 ctx.strokeRect(x, barTop, barWidth, barHeight);
+            }
+
+            if (barHeight >= 22 && barWidth >= 20) {
+                const noteName = getNoteName(note.note);
+                const fontSize = Math.max(10, Math.min(15, Math.min(barHeight * 0.38, barWidth * 0.42)));
+                ctx.font = `600 ${fontSize}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = expected || future ? 'rgba(255, 255, 255, 0.96)' : 'rgba(15, 23, 42, 0.88)';
+                ctx.fillText(noteName, x + barWidth / 2, barTop + barHeight / 2);
             }
             ctx.restore();
         });
