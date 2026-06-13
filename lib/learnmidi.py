@@ -104,6 +104,9 @@ class LearnMIDI:
 
         self.song_tempo = 500000
         self.song_tracks = []
+        self.visualization_notes = []
+        self.visualization_duration = 0.0
+        self.visualization_range = {"min": 21, "max": 108}
         self.ticks_per_beat = 240
         self.is_loaded_midi = {}
         self.is_started_midi = False
@@ -130,6 +133,157 @@ class LearnMIDI:
         if self.ledsettings.black_key_color_enabled and is_black_key(note):
             return [int(c * brightness) for c in get_black_key_color(self.ledsettings)]
         return default_rgb
+
+    def _get_hand_color_rgb(self, channel):
+        if channel == 1:
+            return list(self.hand_colorList[self.hand_colorR])
+        if channel == 2:
+            return list(self.hand_colorList[self.hand_colorL])
+        return [120, 120, 120]
+
+    def _current_visual_time(self):
+        if not self.notes_time:
+            return 0.0
+        if self.current_idx <= 0:
+            return 0.0
+        idx = min(max(self.current_idx - 1, 0), len(self.notes_time) - 1)
+        return float(self.notes_time[idx])
+
+    def _build_visualization_notes(self):
+        notes = []
+        open_notes = {}
+        absolute_time = 0.0
+        min_note = None
+        max_note = None
+        note_id = 0
+
+        for msg in self.song_tracks:
+            absolute_time += mido.tick2second(
+                msg.time,
+                self.ticks_per_beat,
+                self.song_tempo
+            )
+
+            if msg.is_meta or msg.type not in ("note_on", "note_off"):
+                continue
+
+            key = (msg.note, getattr(msg, "channel", 0))
+            is_note_on = msg.type == "note_on" and getattr(msg, "velocity", 0) > 0
+
+            if is_note_on:
+                open_notes.setdefault(key, []).append(absolute_time)
+                min_note = msg.note if min_note is None else min(min_note, msg.note)
+                max_note = msg.note if max_note is None else max(max_note, msg.note)
+                continue
+
+            starts = open_notes.get(key)
+            if not starts:
+                continue
+
+            start_time = starts.pop()
+            end_time = max(absolute_time, start_time + 0.05)
+            note_data = {
+                "id": f"n{note_id}",
+                "note": int(msg.note),
+                "channel": int(getattr(msg, "channel", 0)),
+                "start": round(float(start_time), 6),
+                "end": round(float(end_time), 6),
+                "duration": round(float(end_time - start_time), 6),
+                "is_black": bool(is_black_key(msg.note)),
+            }
+            notes.append(note_data)
+            note_id += 1
+
+        if notes:
+            self.visualization_duration = max(note["end"] for note in notes)
+            self.visualization_range = {
+                "min": int(min_note if min_note is not None else 21),
+                "max": int(max_note if max_note is not None else 108),
+            }
+        else:
+            self.visualization_duration = 0.0
+            self.visualization_range = {"min": 21, "max": 108}
+
+        notes.sort(key=lambda note: (note["start"], note["note"], note["channel"]))
+        self.visualization_notes = notes
+
+    def _get_visualization_payload(self):
+        return {
+            "type": "falling_notes_init",
+            "song_name": getattr(self, "current_song_name", ""),
+            "loading": self.loading,
+            "practice_mode": self.practice,
+            "practice_mode_name": self.practiceList[self.practice],
+            "tempo_percent": self.set_tempo,
+            "start_point": self.start_point,
+            "end_point": self.end_point,
+            "duration": round(float(self.visualization_duration), 6),
+            "note_range": self.visualization_range,
+            "notes": self.visualization_notes,
+            "colors": {
+                "right": self.hand_colorList[self.hand_colorR],
+                "left": self.hand_colorList[self.hand_colorL],
+                "future_right": self.hand_colorList[self.prev_hand_colorR],
+                "future_left": self.hand_colorList[self.prev_hand_colorL],
+            },
+        }
+
+    def get_visualization_payload(self):
+        return self._get_visualization_payload()
+
+    def _emit_socket_event(self, payload):
+        try:
+            self.socket_send.append(json.dumps(payload))
+        except Exception as e:
+            logger.warning(f"Failed to queue socket payload: {e}")
+
+    def emit_visualization_init(self):
+        if self.loading == 4 and self.visualization_notes:
+            self._emit_socket_event(self._get_visualization_payload())
+
+    def emit_visualization_reset(self, clear_song=False):
+        payload = {
+            "type": "learning_reset",
+            "current_time": 0,
+            "song_name": "" if clear_song else getattr(self, "current_song_name", ""),
+        }
+        if clear_song:
+            payload["clear_song"] = True
+        self._emit_socket_event(payload)
+
+    def emit_visualization_state(self, expected_notes=None, future_notes=None, waiting=False, running=True):
+        payload = {
+            "type": "falling_notes_state",
+            "song_name": getattr(self, "current_song_name", ""),
+            "current_time": round(float(self._current_visual_time()), 6),
+            "tempo_percent": self.set_tempo,
+            "practice_mode": self.practice,
+            "practice_mode_name": self.practiceList[self.practice],
+            "waiting_for_input": bool(waiting),
+            "clock_running": bool(running),
+            "expected_notes": sorted({int(note) for note in (expected_notes or [])}),
+            "future_notes": sorted({int(note) for note in (future_notes or [])}),
+            "start_point": self.start_point,
+            "end_point": self.end_point,
+        }
+        self._emit_socket_event(payload)
+
+    def get_predicted_future_notes(self, starting_note, ending_note, notes_to_press):
+        if self.show_future_notes != 1:
+            return []
+
+        predicted_future_notes = []
+        for msg in self.song_tracks[starting_note:ending_note]:
+            tDelay = mido.tick2second(msg.time, self.ticks_per_beat, self.song_tempo * 100 / self.set_tempo)
+
+            if (not msg.is_meta and tDelay > 0 and msg.type in ('note_on', 'note_off') and
+                    predicted_future_notes and self.practice == 0):
+                return predicted_future_notes
+
+            if msg.type == 'note_on' and msg.velocity > 0 and msg.note not in notes_to_press:
+                predicted_future_notes.append(msg)
+
+        return predicted_future_notes
 
     def change_practice(self, value):
         self.practice += value
@@ -210,7 +364,13 @@ class LearnMIDI:
                     self.ticks_per_beat = cache['ticks_per_beat']
                     self.song_tracks = cache['song_tracks']
                     self.notes_time = cache['notes_time']
+                    self.visualization_notes = cache.get('visualization_notes', [])
+                    self.visualization_duration = cache.get('visualization_duration', 0.0)
+                    self.visualization_range = cache.get('visualization_range', {"min": 21, "max": 108})
+                    if not self.visualization_notes:
+                        self._build_visualization_notes()
                     self.loading = 4
+                    self.emit_visualization_init()
                     return True
             else:
                 return False
@@ -298,43 +458,33 @@ class LearnMIDI:
                     time_passed += msg.time
                     self.notes_time.append(time_passed)
 
+            self._build_visualization_notes()
+
             fastColorWipe(self.ledstrip.strip, True, self.ledsettings)
 
             # Save to cache
             with open(song_cache_path(song_path + '.p'), 'wb') as handle:
                 cache = {'song_tempo': self.song_tempo, 'ticks_per_beat': self.ticks_per_beat,
-                         'notes_time': self.notes_time, 'song_tracks': self.song_tracks, }
+                         'notes_time': self.notes_time, 'song_tracks': self.song_tracks,
+                         'visualization_notes': self.visualization_notes,
+                         'visualization_duration': self.visualization_duration,
+                         'visualization_range': self.visualization_range}
                 pickle.dump(cache, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
             self.loading = 4  # 4 = Done
+            self.emit_visualization_init()
         except Exception as e:
             logger.warning(e)
             self.loading = 5  # 5 = Error!
             self.is_loaded_midi.clear()
+            self.emit_visualization_reset(clear_song=True)
 
     # predict future notes in MIDI messages
     def predict_future_notes(self, starting_note, ending_note, notes_to_press):
-
-        if self.show_future_notes != 1:
-            return
-
-        predicted_future_notes = []
-        current_note = starting_note
-        for msg in self.song_tracks[starting_note:ending_note]:
-            # Get time delay
-            tDelay = mido.tick2second(msg.time, self.ticks_per_beat, self.song_tempo * 100 / self.set_tempo)
-
-            if not msg.is_meta and tDelay > 0 and (
-                    msg.type == 'note_on' or msg.type == 'note_off') and predicted_future_notes and self.practice == 0:
-                self.light_up_predicted_future_notes(predicted_future_notes)
-                return
-
-            if msg.type == 'note_on' and msg.velocity > 0:
-                # make sure msg.note is not in notes_to_press list
-                if msg.note not in notes_to_press:
-                    predicted_future_notes.append(msg)
-
-            current_note += 1
+        predicted_future_notes = self.get_predicted_future_notes(starting_note, ending_note, notes_to_press)
+        if predicted_future_notes:
+            self.light_up_predicted_future_notes(predicted_future_notes)
+        return predicted_future_notes
 
     def light_up_predicted_future_notes(self, notes):
         dim = 10
@@ -449,6 +599,8 @@ class LearnMIDI:
                 "multiplier": self.score_manager.get_multiplier(),
                 "last_update": 0 # Reset last update as well
             }))
+            self.emit_visualization_init()
+            self.emit_visualization_state(waiting=False, running=True)
         elif self.loading == 5:
             self.is_started_midi = False  # Allow restarting the Thread
             return
@@ -479,6 +631,7 @@ class LearnMIDI:
             }))
             try:
                 fastColorWipe(self.ledstrip.strip, True, self.ledsettings)
+                self.emit_visualization_state(waiting=False, running=True)
                 time_prev = time.time()
                 notes_to_press = []
 
@@ -513,7 +666,13 @@ class LearnMIDI:
                                 msg.type == 'note_on' or msg.type == 'note_off') and notes_to_press and self.practice == 0:
                             notes_pressed = []
                             wrong_notes = []
-                            self.predict_future_notes(absolute_idx, end_idx, notes_to_press)
+                            predicted_future_notes = self.predict_future_notes(absolute_idx, end_idx, notes_to_press)
+                            self.emit_visualization_state(
+                                expected_notes=notes_to_press,
+                                future_notes=[future_msg.note for future_msg in predicted_future_notes],
+                                waiting=True,
+                                running=False
+                            )
 
                             # Store timing information for next note
                             self.next_note_time = time.time() + tDelay
@@ -523,8 +682,11 @@ class LearnMIDI:
                             while not set(notes_to_press).issubset(notes_pressed) and self.is_started_midi:
                                 if self.awaiting_restart_loop:
                                     break
-                                while self.midiports.midi_queue:
-                                    msg_in, msg_timestamp = self.midiports.midi_queue.popleft()
+                                while True:
+                                    next_input = self.midiports.pop_learning_event()
+                                    if next_input is None:
+                                        break
+                                    msg_in, msg_timestamp = next_input
                                     if msg_in.type not in ("note_on", "note_off"):
                                         continue
 
@@ -601,7 +763,13 @@ class LearnMIDI:
 
                                 # light up predicted future notes again in case the future note was pressed
                                 # and color was overwritten
-                                self.predict_future_notes(absolute_idx, end_idx, notes_to_press)
+                                predicted_future_notes = self.predict_future_notes(absolute_idx, end_idx, notes_to_press)
+                                self.emit_visualization_state(
+                                    expected_notes=notes_to_press,
+                                    future_notes=[future_msg.note for future_msg in predicted_future_notes],
+                                    waiting=True,
+                                    running=False
+                                )
                             
                             hand_hint_notesL = []
                             hand_hint_notesR = []
@@ -615,6 +783,7 @@ class LearnMIDI:
                             fastColorWipe(self.ledstrip.strip, True,
                                           self.ledsettings)  # ideally clear only pressed notes!
                             notes_to_press.clear()
+                            self.emit_visualization_state(waiting=False, running=True)
 
                     # Realize time delay, consider also the time lost during computation
                     delay = max(0, tDelay - (
@@ -698,6 +867,7 @@ class LearnMIDI:
                         self.next_note_delay = None
 
                     if self.awaiting_restart_loop:
+                        self.emit_visualization_reset()
                         self.awaiting_restart_loop = False
                         break
 
@@ -734,6 +904,7 @@ class LearnMIDI:
             # Send session summary data
             if not keep_looping:
                 try:
+                    self.emit_visualization_state(waiting=False, running=False)
                     # Get actual RGB colors
                     color_r_rgb = self.hand_colorList[self.hand_colorR]
                     color_l_rgb = self.hand_colorList[self.hand_colorL]

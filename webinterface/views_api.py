@@ -1312,6 +1312,7 @@ def change_setting():
 
     if setting_name == "stop_learning_song":
         app_state.learning.is_started_midi = False
+        app_state.learning.emit_visualization_state(waiting=False, running=False)
         fastColorWipe(app_state.ledstrip.strip, True, app_state.ledsettings)
 
         return jsonify(success=True)
@@ -2070,6 +2071,8 @@ def get_learning_status():
     except Exception as e:
         logger.warning(f"Failed to get learning status: {e}")
     response = {"loading": app_state.learning.loading,
+                "current_song_name": getattr(app_state.learning, "current_song_name", ""),
+                "is_started_midi": app_state.learning.is_started_midi,
                 "is_loop_active": app_state.learning.is_loop_active,
                 "practice": app_state.learning.practice,
                 "hands": app_state.learning.hands,
@@ -2089,6 +2092,20 @@ def get_learning_status():
                 "hand_colorList": ast.literal_eval(app_state.usersettings.get_setting_value("hand_colorList"))}
 
     return jsonify(response)
+
+
+@webinterface.route('/api/get_learning_visualization', methods=['GET'])
+def get_learning_visualization():
+    learning = getattr(app_state, 'learning', None)
+    if not learning:
+        return jsonify(success=False, error="learning unavailable"), 500
+
+    payload = learning.get_visualization_payload()
+    payload["success"] = True
+    payload["is_started_midi"] = learning.is_started_midi
+    payload["current_time"] = round(float(learning._current_visual_time()), 6)
+    payload["current_song_name"] = getattr(learning, "current_song_name", "")
+    return jsonify(payload)
 
 @webinterface.route('/api/get_song_list_setting', methods=['GET'])
 def get_song_list_setting():

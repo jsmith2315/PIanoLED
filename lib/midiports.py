@@ -424,6 +424,14 @@ class MidiPorts:
     def clear_websocket_midi_queue(self):
         """Clear the websocket MIDI queue."""
         self.websocket_midi_queue.clear()
+
+    def pop_learning_event(self):
+        """Get the next learning MIDI event, preferring websocket input when available."""
+        if self.websocket_midi_queue:
+            return self.websocket_midi_queue.popleft()
+        if self.midi_queue:
+            return self.midi_queue.popleft()
+        return None
     
     def start_midi_monitor(self):
         """Start monitoring for MIDI device changes and auto-connect"""

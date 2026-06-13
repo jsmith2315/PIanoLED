@@ -36,7 +36,11 @@ function loadAjax(subpage) {
     }
 
     const mainElement = document.getElementById("main");
-    
+
+    if (current_page === "practice" && subpage !== "practice" && typeof cleanupPracticePage === 'function') {
+        cleanupPracticePage();
+    }
+
     // Restore padding if leaving practice tab
     if (current_page === "practice" && subpage !== "practice") {
         mainElement.classList.add("p-5");
@@ -113,16 +117,9 @@ function loadAjax(subpage) {
                         clearInterval(homepage_interval);
                         // Remove padding from main element for full-width practice tab
                         mainElement.classList.remove("p-5");
-                        // Extract and execute scripts from practice.html since innerHTML doesn't execute scripts
-                        const practiceScripts = mainElement.querySelectorAll('script');
-                        practiceScripts.forEach(function(oldScript) {
-                            const newScript = document.createElement('script');
-                            Array.from(oldScript.attributes).forEach(attr => {
-                                newScript.setAttribute(attr.name, attr.value);
-                            });
-                            newScript.appendChild(document.createTextNode(oldScript.innerHTML));
-                            oldScript.parentNode.replaceChild(newScript, oldScript);
-                        });
+                        if (typeof initializePracticePage === 'function') {
+                            initializePracticePage();
+                        }
                         break;
                 }
             }

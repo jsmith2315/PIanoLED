@@ -69,7 +69,12 @@
                     } else {
                         console.log("window.go_to_time is not defined, cannot update time."); 
                     }
-                 }; 
+                 };
+            }
+            if (typeof window.handleLearningVisualizationTime !== 'function') {
+                window.handleLearningVisualizationTime = function(timeValue) {
+                    // Practice page can override this when active.
+                };
             }
             if (typeof window.handleMidiEvent !== 'function') {
                 window.handleMidiEvent = function(rawData) {
@@ -96,6 +101,7 @@
                  if (typeof event.data === 'string' && !isNaN(parseFloat(event.data))) {
                     console.log("Received string number message, assuming time update:", event.data);
                     window.handleTimeUpdate(event.data);
+                    window.handleLearningVisualizationTime(event.data);
                  } else {
                     console.log("Received non-JSON message or parse error:", event.data);
                  }
@@ -119,6 +125,21 @@
                         break;
                     case "learning_note_index": // For sheet music sync
                         window.handleTimeUpdate(data.current_note_index); 
+                        break;
+                    case "falling_notes_init":
+                        if (typeof window.handleFallingNotesInit === 'function') {
+                            window.handleFallingNotesInit(data);
+                        }
+                        break;
+                    case "falling_notes_state":
+                        if (typeof window.handleFallingNotesState === 'function') {
+                            window.handleFallingNotesState(data);
+                        }
+                        break;
+                    case "learning_reset":
+                        if (typeof window.handleLearningReset === 'function') {
+                            window.handleLearningReset(data);
+                        }
                         break;
                     case "session_summary":
                         function tryHandleSummary(summaryData, retryCount = 5) {
@@ -147,6 +168,7 @@
                  // Fallback for simple numeric string time update?
                  if (typeof event.data === 'string' && !isNaN(parseFloat(event.data))) {
                     window.handleTimeUpdate(event.data);
+                    window.handleLearningVisualizationTime(event.data);
                  } 
             }
         });
@@ -642,6 +664,7 @@
 <script src="../static/js/utils.js" defer></script>
 <script src="../static/js/globals.js"></script>
 <script src="../static/js/ui.js"></script>
+<script src="../static/js/falling_notes.js"></script>
 <script src="../static/js/profiles.js" defer></script>
 <script src="../static/index.js" defer></script>
 <script>
