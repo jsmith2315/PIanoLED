@@ -20,6 +20,7 @@
         modeEl: null,
         hintEl: null,
         currentTimeEl: null,
+        stageHiddenMessageEl: null,
         songSelectEl: null,
         loadSongButton: null,
         startButton: null,
@@ -393,8 +394,18 @@
         if (state.settingsPanelEl) {
             state.settingsPanelEl.classList.toggle('hidden', !state.settingsOpen);
         }
+        if (state.container) {
+            state.container.classList.toggle('hidden', state.settingsOpen);
+        }
+        if (state.stageHiddenMessageEl) {
+            state.stageHiddenMessageEl.classList.toggle('hidden', !state.settingsOpen);
+            state.stageHiddenMessageEl.classList.toggle('flex', state.settingsOpen);
+        }
         if (state.settingsToggleEl) {
             state.settingsToggleEl.textContent = state.settingsOpen ? 'Hide Settings' : 'Show Settings';
+        }
+        if (!state.settingsOpen) {
+            resizeCanvas();
         }
     }
 
@@ -763,6 +774,7 @@
         state.modeEl = document.getElementById('practice-mode');
         state.hintEl = document.getElementById('practice-hint');
         state.currentTimeEl = document.getElementById('practice-current-time');
+        state.stageHiddenMessageEl = document.getElementById('practice-stage-hidden-message');
         state.songSelectEl = document.getElementById('practice-song-select');
         state.loadSongButton = document.getElementById('practice-load-song');
         state.startButton = document.getElementById('practice-start-learning');
