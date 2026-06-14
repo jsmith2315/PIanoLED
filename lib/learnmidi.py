@@ -251,11 +251,12 @@ class LearnMIDI:
             payload["clear_song"] = True
         self._emit_socket_event(payload)
 
-    def emit_visualization_state(self, expected_notes=None, future_notes=None, waiting=False, running=True):
+    def emit_visualization_state(self, expected_notes=None, future_notes=None, waiting=False, running=True,
+                                 current_time=None):
         payload = {
             "type": "falling_notes_state",
             "song_name": getattr(self, "current_song_name", ""),
-            "current_time": round(float(self._current_visual_time()), 6),
+            "current_time": round(float(self._current_visual_time() if current_time is None else current_time), 6),
             "tempo_percent": self.set_tempo,
             "practice_mode": self.practice,
             "practice_mode_name": self.practiceList[self.practice],
@@ -267,6 +268,14 @@ class LearnMIDI:
             "end_point": self.end_point,
         }
         self._emit_socket_event(payload)
+
+    def _current_wait_visual_time(self):
+        if not self.notes_time:
+            return 0.0
+        if self.current_idx <= 1:
+            return 0.0
+        idx = min(max(self.current_idx - 2, 0), len(self.notes_time) - 1)
+        return float(self.notes_time[idx])
 
     def get_predicted_future_notes(self, starting_note, ending_note, notes_to_press):
         if self.show_future_notes != 1:
@@ -671,7 +680,8 @@ class LearnMIDI:
                                 expected_notes=notes_to_press,
                                 future_notes=[future_msg.note for future_msg in predicted_future_notes],
                                 waiting=True,
-                                running=False
+                                running=False,
+                                current_time=self._current_wait_visual_time()
                             )
 
                             # Store timing information for next note
@@ -768,7 +778,8 @@ class LearnMIDI:
                                     expected_notes=notes_to_press,
                                     future_notes=[future_msg.note for future_msg in predicted_future_notes],
                                     waiting=True,
-                                    running=False
+                                    running=False,
+                                    current_time=self._current_wait_visual_time()
                                 )
                             
                             hand_hint_notesL = []
