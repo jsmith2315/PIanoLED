@@ -20,6 +20,29 @@
         modeEl: null,
         hintEl: null,
         currentTimeEl: null,
+        songSelectEl: null,
+        loadSongButton: null,
+        startButton: null,
+        stopButton: null,
+        settingsToggleEl: null,
+        settingsPanelEl: null,
+        practiceModeSelectEl: null,
+        tempoLabelEl: null,
+        tempoSliderEl: null,
+        handsSelectEl: null,
+        muteHandsSelectEl: null,
+        wrongNotesSelectEl: null,
+        futureNotesSelectEl: null,
+        mistakesInputEl: null,
+        loopCheckboxEl: null,
+        startPointEl: null,
+        endPointEl: null,
+        startPointLabelEl: null,
+        endPointLabelEl: null,
+        leftColorPreviewEl: null,
+        rightColorPreviewEl: null,
+        leftActiveEl: null,
+        rightActiveEl: null,
         notes: [],
         noteRange: { ...DEFAULT_NOTE_RANGE },
         colors: null,
@@ -35,6 +58,8 @@
         practiceModeName: '',
         songName: '',
         loading: 0,
+        settingsOpen: false,
+        handColorList: [],
     };
 
     function rgb(color, alpha) {
@@ -61,6 +86,16 @@
             return 'No song loaded';
         }
         return songName.replace(/\.(mid|midi|musicxml|mxl|xml|abc)$/i, '');
+    }
+
+    function updateColorPreview(element, rgbValues, active) {
+        if (!element) {
+            return;
+        }
+        const fallback = [30, 41, 59];
+        const values = Array.isArray(rgbValues) ? rgbValues : fallback;
+        element.style.background = `rgb(${values[0]}, ${values[1]}, ${values[2]})`;
+        element.style.opacity = active ? '1' : '0.35';
     }
 
     function getCurrentSongTime(nowMs) {
@@ -331,7 +366,7 @@
             if (state.loading > 0 && state.loading < 4) {
                 state.statusEl.textContent = 'Loading song data...';
             } else if (!state.songName) {
-                state.statusEl.textContent = 'Load a song in Songs, then start learning to see the falling notes.';
+                state.statusEl.textContent = 'Choose a song here, then start learning to see the falling notes.';
             } else if (state.waitingForInput) {
                 state.statusEl.textContent = 'Waiting for the correct keys';
             } else if (state.clockRunning) {
@@ -342,7 +377,7 @@
         }
         if (state.hintEl) {
             if (!state.songName) {
-                state.hintEl.textContent = 'The Songs tab still controls song selection, tempo, mode, and loop points.';
+                state.hintEl.textContent = 'Use the song dropdown and settings panel here to set up practice before you start.';
             } else if (state.expectedNotes.size > 0) {
                 state.hintEl.textContent = `Expected notes: ${Array.from(state.expectedNotes).join(', ')}`;
             } else if (state.futureNotes.size > 0) {
@@ -351,6 +386,259 @@
                 state.hintEl.textContent = 'Watch the hit line and keyboard; the LED hints still come from learning mode.';
             }
         }
+    }
+
+    function setSettingsOpen(isOpen) {
+        state.settingsOpen = Boolean(isOpen);
+        if (state.settingsPanelEl) {
+            state.settingsPanelEl.classList.toggle('hidden', !state.settingsOpen);
+        }
+        if (state.settingsToggleEl) {
+            state.settingsToggleEl.textContent = state.settingsOpen ? 'Hide Settings' : 'Show Settings';
+        }
+    }
+
+    function clampNumber(value, min, max, fallback) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) {
+            return fallback;
+        }
+        return Math.min(max, Math.max(min, number));
+    }
+
+    function populateSongOptions(songs, currentSongName) {
+        if (!state.songSelectEl) {
+            return;
+        }
+
+        const currentValue = currentSongName || state.songName || '';
+        state.songSelectEl.innerHTML = '<option value="">Select a song</option>';
+        songs.forEach((song) => {
+            const option = document.createElement('option');
+            option.value = song;
+            option.textContent = formatSongName(song);
+            state.songSelectEl.appendChild(option);
+        });
+        state.songSelectEl.value = currentValue;
+    }
+
+    function populateSettings(response) {
+        state.handColorList = Array.isArray(response.hand_colorList) ? response.hand_colorList : state.handColorList;
+        const practiceValue = response.practice !== undefined ? response.practice : 0;
+        const tempoValue = response.set_tempo !== undefined ? response.set_tempo : 100;
+        const handsValue = response.hands !== undefined ? response.hands : 0;
+        const muteHandsValue = response.mute_hand !== undefined ? response.mute_hand : 0;
+        const wrongNotesValue = response.show_wrong_notes !== undefined ? response.show_wrong_notes : 0;
+        const futureNotesValue = response.show_future_notes !== undefined ? response.show_future_notes : 0;
+        const mistakesValue = response.number_of_mistakes !== undefined ? response.number_of_mistakes : 0;
+        const startPointValue = response.start_point !== undefined ? response.start_point : 0;
+        const endPointValue = response.end_point !== undefined ? response.end_point : 100;
+
+        if (state.practiceModeSelectEl) {
+            state.practiceModeSelectEl.value = String(practiceValue);
+        }
+        if (state.tempoSliderEl) {
+            state.tempoSliderEl.value = String(tempoValue);
+        }
+        if (state.tempoLabelEl) {
+            state.tempoLabelEl.textContent = String(tempoValue);
+        }
+        if (state.handsSelectEl) {
+            state.handsSelectEl.value = String(handsValue);
+        }
+        if (state.muteHandsSelectEl) {
+            state.muteHandsSelectEl.value = String(muteHandsValue);
+        }
+        if (state.wrongNotesSelectEl) {
+            state.wrongNotesSelectEl.value = String(wrongNotesValue);
+        }
+        if (state.futureNotesSelectEl) {
+            state.futureNotesSelectEl.value = String(futureNotesValue);
+        }
+        if (state.mistakesInputEl) {
+            state.mistakesInputEl.value = String(mistakesValue);
+        }
+        if (state.loopCheckboxEl) {
+            state.loopCheckboxEl.checked = Number(response.is_loop_active) === 1;
+        }
+        if (state.startPointEl) {
+            state.startPointEl.value = String(startPointValue);
+        }
+        if (state.endPointEl) {
+            state.endPointEl.value = String(endPointValue);
+        }
+        if (state.startPointLabelEl) {
+            state.startPointLabelEl.textContent = String(startPointValue);
+        }
+        if (state.endPointLabelEl) {
+            state.endPointLabelEl.textContent = String(endPointValue);
+        }
+        if (state.leftActiveEl) {
+            state.leftActiveEl.checked = Number(response.is_led_activeL) === 1;
+        }
+        if (state.rightActiveEl) {
+            state.rightActiveEl.checked = Number(response.is_led_activeR) === 1;
+        }
+
+        const leftColor = (state.handColorList && state.handColorList[response.hand_colorL]) || [30, 64, 175];
+        const rightColor = (state.handColorList && state.handColorList[response.hand_colorR]) || [34, 197, 94];
+        updateColorPreview(state.leftColorPreviewEl, leftColor, Number(response.is_led_activeL) === 1);
+        updateColorPreview(state.rightColorPreviewEl, rightColor, Number(response.is_led_activeR) === 1);
+    }
+
+    function fetchSongOptions() {
+        return fetch('/api/get_song_options')
+            .then((response) => response.json())
+            .then((payload) => {
+                if (!payload.success) {
+                    throw new Error(payload.error || 'Failed to load songs');
+                }
+                populateSongOptions(payload.songs || [], state.songName);
+            })
+            .catch((error) => {
+                console.error('Failed to fetch song options:', error);
+            });
+    }
+
+    function fetchLearningSettings() {
+        return fetch('/api/get_learning_status')
+            .then((response) => response.json())
+            .then((payload) => {
+                populateSettings(payload);
+                if (payload.current_song_name) {
+                    state.songName = payload.current_song_name;
+                    if (state.songSelectEl) {
+                        state.songSelectEl.value = payload.current_song_name;
+                    }
+                }
+            })
+            .catch((error) => {
+                console.error('Failed to fetch learning settings:', error);
+            });
+    }
+
+    function practiceApplySetting(settingName, value, secondValue = false, disableSequence = false) {
+        return new Promise((resolve) => {
+            change_setting(settingName, value, secondValue, disableSequence);
+            window.setTimeout(() => {
+                Promise.all([fetchLearningSettings(), fetchVisualizationState()]).finally(resolve);
+            }, 250);
+        });
+    }
+
+    function loadSelectedSong() {
+        const selectedSong = state.songSelectEl ? state.songSelectEl.value : '';
+        if (!selectedSong) {
+            return;
+        }
+
+        practiceApplySetting('learning_load_song', selectedSong).then(() => {
+            if (state.statusEl) {
+                state.statusEl.textContent = 'Loading song data...';
+            }
+        });
+    }
+
+    function bindPracticeControls() {
+        if (state.settingsToggleEl) {
+            state.settingsToggleEl.addEventListener('click', () => setSettingsOpen(!state.settingsOpen));
+        }
+        if (state.loadSongButton) {
+            state.loadSongButton.addEventListener('click', loadSelectedSong);
+        }
+        if (state.songSelectEl) {
+            state.songSelectEl.addEventListener('change', loadSelectedSong);
+        }
+        if (state.startButton) {
+            state.startButton.addEventListener('click', () => practiceApplySetting('start_learning_song', ''));
+        }
+        if (state.stopButton) {
+            state.stopButton.addEventListener('click', () => practiceApplySetting('stop_learning_song', ''));
+        }
+        if (state.practiceModeSelectEl) {
+            state.practiceModeSelectEl.addEventListener('change', (event) => practiceApplySetting('change_practice', event.target.value));
+        }
+        if (state.tempoSliderEl) {
+            state.tempoSliderEl.addEventListener('input', (event) => {
+                if (state.tempoLabelEl) {
+                    state.tempoLabelEl.textContent = event.target.value;
+                }
+            });
+            state.tempoSliderEl.addEventListener('change', (event) => practiceApplySetting('change_tempo', event.target.value));
+        }
+        const tempoStep = (delta) => {
+            if (!state.tempoSliderEl) {
+                return;
+            }
+            const nextValue = clampNumber(Number(state.tempoSliderEl.value) + delta, 10, 200, 100);
+            state.tempoSliderEl.value = String(nextValue);
+            if (state.tempoLabelEl) {
+                state.tempoLabelEl.textContent = String(nextValue);
+            }
+            practiceApplySetting('change_tempo', String(nextValue));
+        };
+        const tempoDown = document.getElementById('practice-tempo-down');
+        const tempoUp = document.getElementById('practice-tempo-up');
+        if (tempoDown) {
+            tempoDown.addEventListener('click', () => tempoStep(-1));
+        }
+        if (tempoUp) {
+            tempoUp.addEventListener('click', () => tempoStep(1));
+        }
+        if (state.handsSelectEl) {
+            state.handsSelectEl.addEventListener('change', (event) => practiceApplySetting('change_hands', event.target.value));
+        }
+        if (state.muteHandsSelectEl) {
+            state.muteHandsSelectEl.addEventListener('change', (event) => practiceApplySetting('change_mute_hand', event.target.value));
+        }
+        if (state.wrongNotesSelectEl) {
+            state.wrongNotesSelectEl.addEventListener('change', (event) => practiceApplySetting('change_wrong_notes', event.target.value));
+        }
+        if (state.futureNotesSelectEl) {
+            state.futureNotesSelectEl.addEventListener('change', (event) => practiceApplySetting('change_future_notes', event.target.value));
+        }
+        if (state.mistakesInputEl) {
+            state.mistakesInputEl.addEventListener('change', (event) => {
+                const value = clampNumber(event.target.value, 0, 255, 0);
+                event.target.value = String(value);
+                practiceApplySetting('number_of_mistakes', String(value));
+            });
+        }
+        if (state.loopCheckboxEl) {
+            state.loopCheckboxEl.addEventListener('change', (event) => practiceApplySetting('change_learning_loop', event.target.checked ? 'true' : 'false'));
+        }
+        if (state.startPointEl) {
+            state.startPointEl.addEventListener('input', (event) => {
+                if (state.startPointLabelEl) {
+                    state.startPointLabelEl.textContent = event.target.value;
+                }
+            });
+            state.startPointEl.addEventListener('change', (event) => practiceApplySetting('learning_start_point', event.target.value));
+        }
+        if (state.endPointEl) {
+            state.endPointEl.addEventListener('input', (event) => {
+                if (state.endPointLabelEl) {
+                    state.endPointLabelEl.textContent = event.target.value;
+                }
+            });
+            state.endPointEl.addEventListener('change', (event) => practiceApplySetting('learning_end_point', event.target.value));
+        }
+        if (state.leftActiveEl) {
+            state.leftActiveEl.addEventListener('change', (event) => practiceApplySetting('change_left_led_active', event.target.checked ? 'true' : 'false'));
+        }
+        if (state.rightActiveEl) {
+            state.rightActiveEl.addEventListener('change', (event) => practiceApplySetting('change_right_led_active', event.target.checked ? 'true' : 'false'));
+        }
+        const bindColorButton = (id, settingName, step) => {
+            const button = document.getElementById(id);
+            if (button) {
+                button.addEventListener('click', () => practiceApplySetting(settingName, String(step)));
+            }
+        };
+        bindColorButton('practice-left-color-prev', 'change_handL_color', -1);
+        bindColorButton('practice-left-color-next', 'change_handL_color', 1);
+        bindColorButton('practice-right-color-prev', 'change_handR_color', -1);
+        bindColorButton('practice-right-color-next', 'change_handR_color', 1);
     }
 
     function draw(timestamp) {
@@ -425,6 +713,9 @@
             }
 
             state.songName = payload.song_name || state.songName;
+            if (state.songSelectEl && state.songName) {
+                state.songSelectEl.value = state.songName;
+            }
             state.practiceModeName = payload.practice_mode_name || state.practiceModeName;
             state.tempoPercent = Number(payload.tempo_percent || state.tempoPercent || 100);
             state.waitingForInput = Boolean(payload.waiting_for_input);
@@ -472,6 +763,29 @@
         state.modeEl = document.getElementById('practice-mode');
         state.hintEl = document.getElementById('practice-hint');
         state.currentTimeEl = document.getElementById('practice-current-time');
+        state.songSelectEl = document.getElementById('practice-song-select');
+        state.loadSongButton = document.getElementById('practice-load-song');
+        state.startButton = document.getElementById('practice-start-learning');
+        state.stopButton = document.getElementById('practice-stop-learning');
+        state.settingsToggleEl = document.getElementById('practice-settings-toggle');
+        state.settingsPanelEl = document.getElementById('practice-settings-panel');
+        state.practiceModeSelectEl = document.getElementById('practice-setting-mode');
+        state.tempoLabelEl = document.getElementById('practice-tempo-label');
+        state.tempoSliderEl = document.getElementById('practice-tempo-slider');
+        state.handsSelectEl = document.getElementById('practice-hands');
+        state.muteHandsSelectEl = document.getElementById('practice-mute-hands');
+        state.wrongNotesSelectEl = document.getElementById('practice-wrong-notes');
+        state.futureNotesSelectEl = document.getElementById('practice-future-notes');
+        state.mistakesInputEl = document.getElementById('practice-mistakes');
+        state.loopCheckboxEl = document.getElementById('practice-loop');
+        state.startPointEl = document.getElementById('practice-start-point');
+        state.endPointEl = document.getElementById('practice-end-point');
+        state.startPointLabelEl = document.getElementById('practice-start-point-label');
+        state.endPointLabelEl = document.getElementById('practice-end-point-label');
+        state.leftColorPreviewEl = document.getElementById('practice-left-color-preview');
+        state.rightColorPreviewEl = document.getElementById('practice-right-color-preview');
+        state.leftActiveEl = document.getElementById('practice-left-active');
+        state.rightActiveEl = document.getElementById('practice-right-active');
 
         if (!state.container || !state.canvas) {
             return;
@@ -480,10 +794,12 @@
         state.ctx = state.canvas.getContext('2d');
         state.isActive = true;
         attachGlobalHandlers();
+        bindPracticeControls();
+        setSettingsOpen(false);
         state.resizeHandler = resizeCanvas;
         window.addEventListener('resize', state.resizeHandler);
         resizeCanvas();
-        fetchVisualizationState();
+        Promise.all([fetchVisualizationState(), fetchSongOptions(), fetchLearningSettings()]);
 
         if (state.animationFrameId !== null) {
             window.cancelAnimationFrame(state.animationFrameId);

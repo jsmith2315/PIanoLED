@@ -2114,6 +2114,21 @@ def get_song_list_setting():
     }
     return jsonify(response)
 
+
+@webinterface.route('/api/get_song_options', methods=['GET'])
+def get_song_options():
+    songs = []
+    try:
+        for name in sorted(os.listdir(SONGS_DIR), key=str.lower):
+            if "_#" in name or not name.endswith('.mid'):
+                continue
+            songs.append(name)
+    except Exception as e:
+        logger.warning(f"Failed to get song options: {e}")
+        return jsonify(success=False, error=str(e), songs=[]), 500
+
+    return jsonify(success=True, songs=songs)
+
 @webinterface.route('/api/get_songs', methods=['GET'])
 def get_songs():
     page = request.args.get('page')

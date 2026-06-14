@@ -1,40 +1,253 @@
 <div id="practice-container" class="transition duration-300 slide-in-content w-full h-full flex flex-col snap-center"
      style="min-height: calc(100dvh - 120px); min-height: calc(100vh - 120px);">
     <div class="glass shadow-glass-lg rounded-glass p-4 md:p-5 mb-4">
-        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
+        <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
+            <div class="xl:max-w-[40%]">
                 <div class="text-xs uppercase tracking-[0.24em] text-cyan-500 font-semibold">Visual Practice</div>
                 <h2 id="practice-song-name" class="text-2xl md:text-3xl font-bold text-gray-700 dark:text-gray-100 mt-1">
                     No song loaded
                 </h2>
                 <p id="practice-status" class="text-sm md:text-base text-gray-600 dark:text-gray-300 mt-2">
-                    Load a song in Songs, then start learning to see the falling notes.
+                    Load a song and start learning to see the falling notes.
                 </p>
                 <p id="practice-hint" class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    The Songs tab still controls song selection, tempo, mode, and loop points.
+                    Pick a song here and keep the learning controls beside the visualizer.
                 </p>
             </div>
-            <div class="flex flex-wrap items-center gap-3 lg:justify-end">
-                <div class="glass-light rounded-glass px-4 py-3 min-w-[140px]">
-                    <div class="text-[11px] uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Mode</div>
-                    <div id="practice-mode" class="text-lg font-semibold text-gray-700 dark:text-gray-100">Waiting</div>
-                </div>
-                <div class="glass-light rounded-glass px-4 py-3 min-w-[140px]">
-                    <div class="text-[11px] uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Song Time</div>
-                    <div id="practice-current-time" class="text-lg font-semibold text-gray-700 dark:text-gray-100">0.00s</div>
-                </div>
-                <button onclick="history.pushState({}, '', '#songs'); loadAjax('songs');"
-                        class="h-10 outline-none glass-light hover:glass font-semibold py-2 px-4 rounded-glass transition-smooth-fast">
-                    Open Songs
+
+            <div class="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(260px,1fr)_auto_auto_auto] gap-3 items-end">
+                <label class="block">
+                    <span class="block text-[11px] uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-2">
+                        Song
+                    </span>
+                    <div class="relative">
+                        <select id="practice-song-select"
+                                class="h-11 block appearance-none w-full glass-light hover:glass py-2 px-3 pr-9 rounded-glass transition-smooth-fast leading-tight focus:outline-none">
+                            <option value="">Select a song</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-700 dark:text-gray-200">
+                            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </label>
+
+                <button id="practice-load-song"
+                        class="h-11 outline-none glass-light hover:glass font-semibold py-2 px-4 rounded-glass transition-smooth-fast">
+                    Load Song
                 </button>
-                <button onclick="change_setting('start_learning_song', '')"
-                        class="h-10 outline-none glass-light hover:glass font-semibold py-2 px-4 rounded-glass transition-smooth-fast">
+
+                <button id="practice-start-learning"
+                        class="h-11 outline-none glass-light hover:glass font-semibold py-2 px-4 rounded-glass transition-smooth-fast">
                     Start
                 </button>
-                <button onclick="change_setting('stop_learning_song', '')"
-                        class="h-10 outline-none glass-light hover:glass font-semibold py-2 px-4 rounded-glass transition-smooth-fast">
+
+                <button id="practice-stop-learning"
+                        class="h-11 outline-none glass-light hover:glass font-semibold py-2 px-4 rounded-glass transition-smooth-fast">
                     Stop
                 </button>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 mt-4">
+            <div class="glass-light rounded-glass px-4 py-3 min-w-[140px]">
+                <div class="text-[11px] uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Mode</div>
+                <div id="practice-mode" class="text-lg font-semibold text-gray-700 dark:text-gray-100">Waiting</div>
+            </div>
+            <div class="glass-light rounded-glass px-4 py-3 min-w-[140px]">
+                <div class="text-[11px] uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Song Time</div>
+                <div id="practice-current-time" class="text-lg font-semibold text-gray-700 dark:text-gray-100">0.00s</div>
+            </div>
+            <button id="practice-settings-toggle"
+                    class="h-11 outline-none glass-light hover:glass font-semibold py-2 px-4 rounded-glass transition-smooth-fast">
+                Show Settings
+            </button>
+        </div>
+
+        <div id="practice-settings-panel" class="hidden mt-4 pt-4 border-t border-white/10">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <label class="block">
+                    <span class="block uppercase tracking-wide text-xs font-bold text-gray-600 dark:text-gray-400 mb-2">Practice</span>
+                    <div class="relative">
+                        <select id="practice-setting-mode"
+                                class="h-10 block appearance-none w-full glass-light hover:glass py-2 px-3 pr-9 rounded-glass transition-smooth-fast leading-tight focus:outline-none">
+                            <option value="0">Melody</option>
+                            <option value="1">Rhythm</option>
+                            <option value="2">Listen</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-700 dark:text-gray-200">
+                            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </label>
+
+                <div class="block">
+                    <span class="block uppercase tracking-wide text-xs font-bold text-gray-600 dark:text-gray-400 mb-2">
+                        Tempo (<b id="practice-tempo-label">100</b>%)
+                    </span>
+                    <div class="flex items-center gap-3">
+                        <button id="practice-tempo-down" class="p-1 glass-light hover:glass rounded-full transition-smooth-fast" type="button">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+                            </svg>
+                        </button>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">10</span>
+                        <input id="practice-tempo-slider" class="w-full" type="range" value="100" min="10" max="200">
+                        <span class="text-xs text-gray-500 dark:text-gray-400">200</span>
+                        <button id="practice-tempo-up" class="p-1 glass-light hover:glass rounded-full transition-smooth-fast" type="button">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <label class="block">
+                    <span class="block uppercase tracking-wide text-xs font-bold text-gray-600 dark:text-gray-400 mb-2">Hands</span>
+                    <div class="relative">
+                        <select id="practice-hands"
+                                class="h-10 block appearance-none w-full glass-light hover:glass py-2 px-3 pr-9 rounded-glass transition-smooth-fast leading-tight focus:outline-none">
+                            <option value="0">Both</option>
+                            <option value="1">Right</option>
+                            <option value="2">Left</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-700 dark:text-gray-200">
+                            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </label>
+
+                <label class="block">
+                    <span class="block uppercase tracking-wide text-xs font-bold text-gray-600 dark:text-gray-400 mb-2">Mute Hands</span>
+                    <div class="relative">
+                        <select id="practice-mute-hands"
+                                class="h-10 block appearance-none w-full glass-light hover:glass py-2 px-3 pr-9 rounded-glass transition-smooth-fast leading-tight focus:outline-none">
+                            <option value="0">Off</option>
+                            <option value="1">Right</option>
+                            <option value="2">Left</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-700 dark:text-gray-200">
+                            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </label>
+
+                <label class="block">
+                    <span class="block uppercase tracking-wide text-xs font-bold text-gray-600 dark:text-gray-400 mb-2">Wrong Notes</span>
+                    <div class="relative">
+                        <select id="practice-wrong-notes"
+                                class="h-10 block appearance-none w-full glass-light hover:glass py-2 px-3 pr-9 rounded-glass transition-smooth-fast leading-tight focus:outline-none">
+                            <option value="0">Disabled</option>
+                            <option value="1">Enabled</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-700 dark:text-gray-200">
+                            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </label>
+
+                <label class="block">
+                    <span class="block uppercase tracking-wide text-xs font-bold text-gray-600 dark:text-gray-400 mb-2">Future Notes</span>
+                    <div class="relative">
+                        <select id="practice-future-notes"
+                                class="h-10 block appearance-none w-full glass-light hover:glass py-2 px-3 pr-9 rounded-glass transition-smooth-fast leading-tight focus:outline-none">
+                            <option value="0">Disabled</option>
+                            <option value="1">Enabled</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-700 dark:text-gray-200">
+                            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </label>
+            </div>
+
+            <div class="mt-4 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4 items-end">
+                <label class="block">
+                    <span class="block uppercase tracking-wide text-xs font-bold text-gray-600 dark:text-gray-400 mb-2">
+                        Number of Mistakes to Restart Loop (0 = Never)
+                    </span>
+                    <input id="practice-mistakes"
+                           type="number"
+                           min="0"
+                           max="255"
+                           class="h-10 block appearance-none w-full glass-light hover:glass text-center rounded-glass transition-smooth-fast leading-tight focus:outline-none">
+                </label>
+
+                <label class="inline-flex items-center gap-2 mb-1">
+                    <input id="practice-loop" class="w-4 h-4 border border-gray-300 rounded" type="checkbox">
+                    <span class="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-[0.16em]">Loop</span>
+                </label>
+            </div>
+
+            <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <label class="block">
+                    <span class="block uppercase tracking-wide text-xs font-bold text-gray-600 dark:text-gray-400 mb-2">
+                        Start Point (<b id="practice-start-point-label">0</b>%)
+                    </span>
+                    <input id="practice-start-point" class="w-full" type="range" min="0" max="99" step="1" value="0">
+                </label>
+
+                <label class="block">
+                    <span class="block uppercase tracking-wide text-xs font-bold text-gray-600 dark:text-gray-400 mb-2">
+                        End Point (<b id="practice-end-point-label">100</b>%)
+                    </span>
+                    <input id="practice-end-point" class="w-full" type="range" min="1" max="100" step="1" value="100">
+                </label>
+            </div>
+
+            <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div class="glass-light rounded-glass p-4">
+                    <div class="text-xs font-bold uppercase tracking-[0.18em] text-gray-600 dark:text-gray-400 mb-3">Left Hand Color</div>
+                    <div class="flex items-center gap-4">
+                        <button id="practice-left-color-prev" class="p-1 glass hover:glass-light rounded-full transition-smooth-fast" type="button">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+                        <div id="practice-left-color-preview" class="w-14 h-10 rounded-glass border border-white/15"></div>
+                        <button id="practice-left-color-next" class="p-1 glass hover:glass-light rounded-full transition-smooth-fast" type="button">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                    </div>
+                    <label class="inline-flex items-center gap-2 mt-3">
+                        <input id="practice-left-active" class="w-4 h-4 border border-gray-300 rounded" type="checkbox">
+                        <span class="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-[0.16em]">Active</span>
+                    </label>
+                </div>
+
+                <div class="glass-light rounded-glass p-4">
+                    <div class="text-xs font-bold uppercase tracking-[0.18em] text-gray-600 dark:text-gray-400 mb-3">Right Hand Color</div>
+                    <div class="flex items-center gap-4">
+                        <button id="practice-right-color-prev" class="p-1 glass hover:glass-light rounded-full transition-smooth-fast" type="button">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+                        <div id="practice-right-color-preview" class="w-14 h-10 rounded-glass border border-white/15"></div>
+                        <button id="practice-right-color-next" class="p-1 glass hover:glass-light rounded-full transition-smooth-fast" type="button">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                    </div>
+                    <label class="inline-flex items-center gap-2 mt-3">
+                        <input id="practice-right-active" class="w-4 h-4 border border-gray-300 rounded" type="checkbox">
+                        <span class="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-[0.16em]">Active</span>
+                    </label>
+                </div>
             </div>
         </div>
     </div>
